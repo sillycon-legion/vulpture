@@ -1,0 +1,13 @@
+{
+    "pr_number": 31653,
+    "commit": "4a3d8e5b06ed440ebadc9485b4520247705deb8a",
+    "changelog": {
+        "author": "Errant",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "The AI Eye can now teleport to any location on the station by Alt-Clicking on the Crew Monitor map."
+            }
+        ]
+    }
+}

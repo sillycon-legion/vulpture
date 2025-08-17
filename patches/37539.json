@@ -1,0 +1,13 @@
+{
+    "pr_number": 37539,
+    "commit": "c2eba57f727ba7e8aa88f9fbe33b479355be1549",
+    "changelog": {
+        "author": "ScarKy0, MilonPL, beck-thompson",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "The vulpkanin species can now be selected as a roundstart species."
+            }
+        ]
+    }
+}
