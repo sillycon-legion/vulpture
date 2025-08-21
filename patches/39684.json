@@ -1,0 +1,13 @@
+{
+    "pr_number": 39684,
+    "commit": "f17fceede2b2533a2a7dd68e4ff7cd6584366b80",
+    "changelog": {
+        "author": "B_Kirill",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Added camera map. Cutting MAP wire hides camera from map while keeping it accessible in camera list."
+            }
+        ]
+    }
+}

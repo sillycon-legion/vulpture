@@ -1,0 +1,13 @@
+{
+    "pr_number": 39701,
+    "commit": "e575e2b2adad6bb442b9cda53f8d8515e077821d",
+    "changelog": {
+        "author": "Alkheemist",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Added stencil lettering decals to the spraypainter."
+            }
+        ]
+    }
+}

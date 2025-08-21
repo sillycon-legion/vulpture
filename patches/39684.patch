@@ -1,0 +1,715 @@
+diff --git a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorBoundUi.cs b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorBoundUi.cs
+index e3646c00cc..561744cf62 100644
+--- a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorBoundUi.cs
++++ b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorBoundUi.cs
+@@ -34,11 +34,17 @@ protected override void Open()
+         _window.SubnetRefresh += OnSubnetRefresh;
+         _window.CameraSwitchTimer += OnCameraSwitchTimer;
+         _window.CameraDisconnect += OnCameraDisconnect;
++
++        var xform = EntMan.GetComponent<TransformComponent>(Owner);
++        var gridUid = xform.GridUid ?? xform.MapUid;
++
++        if (gridUid is not null)
++            _window?.SetMap(gridUid.Value);
+     }
+ 
+-    private void OnCameraSelected(string address)
++    private void OnCameraSelected(string address, string? subnet)
+     {
+-        SendMessage(new SurveillanceCameraMonitorSwitchMessage(address));
++        SendMessage(new SurveillanceCameraMonitorSwitchMessage(address, subnet));
+     }
+ 
+     private void OnSubnetRequest(string subnet)
+diff --git a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml
+index 8f996b8171..855a20b17c 100644
+--- a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml
++++ b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml
+@@ -1,25 +1,71 @@
+ <DefaultWindow xmlns="https://spacestation14.io"
+                xmlns:viewport="clr-namespace:Content.Client.Viewport"
++               xmlns:local="clr-namespace:Content.Client.SurveillanceCamera.UI"
+                Title="{Loc 'surveillance-camera-monitor-ui-window'}">
+-    <BoxContainer Orientation="Horizontal">
+-        <BoxContainer Orientation="Vertical" MinWidth="350" VerticalExpand="True">
+-            <!-- lazy -->
+-            <OptionButton Name="SubnetSelector" />
+-            <Button Name="SubnetRefreshButton" Text="{Loc 'surveillance-camera-monitor-ui-refresh-subnets'}" />
+-            <ScrollContainer VerticalExpand="True">
+-                <ItemList Name="SubnetList" />
+-            </ScrollContainer>
+-            <Button Name="CameraRefreshButton" Text="{Loc 'surveillance-camera-monitor-ui-refresh-cameras'}" />
+-            <Button Name="CameraDisconnectButton" Text="{Loc 'surveillance-camera-monitor-ui-disconnect'}" />
+-            <Label Name="CameraStatus" />
++    <BoxContainer>
++        <!-- Panel with tabs -->
++        <BoxContainer Orientation="Vertical" MinWidth="350">
++            <TabContainer Name="ViewModeTabs" VerticalExpand="True">
++                <!-- Camera list tab -->
++                <BoxContainer Name="{Loc 'surveillance-camera-monitor-ui-tab-list'}" Orientation="Vertical">
++                    <OptionButton Name="SubnetSelector"/>
++                    <Button Name="SubnetRefreshButton" Text="{Loc 'surveillance-camera-monitor-ui-refresh-subnets'}"/>
++                    <ScrollContainer VerticalExpand="True">
++                        <ItemList Name="SubnetList"/>
++                    </ScrollContainer>
++                    <Button Name="CameraRefreshButton" Text="{Loc 'surveillance-camera-monitor-ui-refresh-cameras'}"/>
++                </BoxContainer>
++
++                <!-- Map view tab -->
++                <BoxContainer Name="{Loc 'surveillance-camera-monitor-ui-tab-map'}" Orientation="Vertical" VerticalExpand="True">
++                    <local:SurveillanceCameraNavMapControl Name="CameraMap"
++                                                           VerticalExpand="True"
++                                                           HorizontalExpand="True"
++                                                           MinSize="350 350"/>
++
++                    <!-- Map legend -->
++                    <BoxContainer Name="LegendContainer" Margin="0 10">
++                        <TextureRect Stretch="KeepAspectCentered"
++                                     TexturePath="/Textures/Interface/NavMap/beveled_triangle.png"
++                                     Modulate="#FF00FF"
++                                     SetSize="20 20"
++                                     Margin="10 0 5 0"/>
++                        <Label Text="{Loc 'surveillance-camera-monitor-ui-legend-active'}"/>
++
++                        <TextureRect Stretch="KeepAspectCentered"
++                                     TexturePath="/Textures/Interface/NavMap/beveled_triangle.png"
++                                     SetSize="20 20"
++                                     Modulate="#fbff19ff"
++                                     Margin="10 0 5 0"/>
++                        <Label Text="{Loc 'surveillance-camera-monitor-ui-legend-selected'}"/>
++
++                        <TextureRect Stretch="KeepAspectCentered"
++                                     TexturePath="/Textures/Interface/NavMap/beveled_circle.png"
++                                     SetSize="20 20"
++                                     Modulate="#a09f9fff"
++                                     Margin="10 0 5 0"/>
++                        <Label Text="{Loc 'surveillance-camera-monitor-ui-legend-inactive'}"/>
++
++                        <TextureRect Stretch="KeepAspectCentered"
++                                     TexturePath="/Textures/Interface/NavMap/beveled_square.png"
++                                     SetSize="20 20"
++                                     Modulate="#fa1f1fff"
++                                     Margin="10 0 5 0"/>
++                        <Label Text="{Loc 'surveillance-camera-monitor-ui-legend-invalid'}"/>
++                    </BoxContainer>
++                    <Button Name="SubnetRefreshButtonMap" Text="{Loc 'surveillance-camera-monitor-ui-refresh-subnets'}"/>
++                </BoxContainer>
++            </TabContainer>
++            <Button Name="CameraDisconnectButton" Text="{Loc 'surveillance-camera-monitor-ui-disconnect'}"/>
++        </BoxContainer>
++
++        <!-- Right panel with camera view -->
++        <BoxContainer Orientation="Vertical" HorizontalExpand="True">
++            <Label Name="CameraStatus"/>
++            <Control VerticalExpand="True" Margin="5" Name="CameraViewBox">
++                <viewport:ScalingViewport Name="CameraView" MinSize="500 500" MouseFilter="Ignore"/>
++                <TextureRect MinSize="500 500" Name="CameraViewBackground" />
++            </Control>
+         </BoxContainer>
+-        <Control VerticalExpand="True" HorizontalExpand="True" Margin="5 5 5 5" Name="CameraViewBox">
+-            <viewport:ScalingViewport Name="CameraView"
+-                                      VerticalExpand="True"
+-                                      HorizontalExpand="True"
+-                                      MinSize="500 500"
+-                                      MouseFilter="Ignore" />
+-            <TextureRect VerticalExpand="True" HorizontalExpand="True" MinSize="500 500" Name="CameraViewBackground" />
+-        </Control>
+     </BoxContainer>
+ </DefaultWindow>
+diff --git a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml.cs b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml.cs
+index ac82fbff59..aa71958289 100644
+--- a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml.cs
++++ b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraMonitorWindow.xaml.cs
+@@ -3,6 +3,7 @@
+ using Content.Client.Viewport;
+ using Content.Shared.DeviceNetwork;
+ using Content.Shared.SurveillanceCamera;
++using Content.Shared.SurveillanceCamera.Components;
+ using Robust.Client.AutoGenerated;
+ using Robust.Client.Graphics;
+ using Robust.Client.ResourceManagement;
+@@ -21,8 +22,15 @@ public sealed partial class SurveillanceCameraMonitorWindow : DefaultWindow
+ 
+     [Dependency] private readonly IPrototypeManager _prototypeManager = default!;
+     [Dependency] private readonly IResourceCache _resourceCache = default!;
++    [Dependency] private readonly IEntityManager _entityManager = default!;
++
++    /// <summary>
++    /// Triggered when a camera is selected.
++    /// First parameter contains the camera's address.
++    /// Second optional parameter contains a subnet - if possible, the monitor will switch to this subnet.
++    /// </summary>
++    public event Action<string, string?>? CameraSelected;
+ 
+-    public event Action<string>? CameraSelected;
+     public event Action<string>? SubnetOpened;
+     public event Action? CameraRefresh;
+     public event Action? SubnetRefresh;
+@@ -33,6 +41,7 @@ public sealed partial class SurveillanceCameraMonitorWindow : DefaultWindow
+     private bool _isSwitching;
+     private readonly FixedEye _defaultEye = new();
+     private readonly Dictionary<string, int> _subnetMap = new();
++    private EntityUid? _mapUid;
+ 
+     private string? SelectedSubnet
+     {
+@@ -68,11 +77,15 @@ public SurveillanceCameraMonitorWindow()
+         SubnetSelector.OnItemSelected += args =>
+         {
+             // piss
+-            SubnetOpened!((string) args.Button.GetItemMetadata(args.Id)!);
++            SubnetOpened?.Invoke((string) args.Button.GetItemMetadata(args.Id)!);
+         };
+-        SubnetRefreshButton.OnPressed += _ => SubnetRefresh!();
+-        CameraRefreshButton.OnPressed += _ => CameraRefresh!();
+-        CameraDisconnectButton.OnPressed += _ => CameraDisconnect!();
++        SubnetRefreshButton.OnPressed += _ => SubnetRefresh?.Invoke();
++        SubnetRefreshButtonMap.OnPressed += _ => SubnetRefresh?.Invoke();
++        CameraRefreshButton.OnPressed += _ => CameraRefresh?.Invoke();
++        CameraDisconnectButton.OnPressed += _ => CameraDisconnect?.Invoke();
++
++        CameraMap.EnableCameraSelection = true;
++        CameraMap.CameraSelected += OnCameraMapSelected;
+     }
+ 
+ 
+@@ -80,6 +93,9 @@ public SurveillanceCameraMonitorWindow()
+     // pass it here so that the UI can change its view.
+     public void UpdateState(IEye? eye, HashSet<string> subnets, string activeAddress, string activeSubnet, Dictionary<string, string> cameras)
+     {
++        CameraMap.SetActiveCameraAddress(activeAddress);
++        CameraMap.SetAvailableSubnets(subnets);
++
+         _currentAddress = activeAddress;
+         SetCameraView(eye);
+ 
+@@ -189,6 +205,25 @@ private int AddSubnet(string subnet)
+ 
+     private void OnSubnetListSelect(ItemList.ItemListSelectedEventArgs args)
+     {
+-        CameraSelected!((string) SubnetList[args.ItemIndex].Metadata!);
++        CameraSelected!((string) SubnetList[args.ItemIndex].Metadata!, null);
++    }
++
++    public void SetMap(EntityUid mapUid)
++    {
++        CameraMap.MapUid = _mapUid = mapUid;
++    }
++
++    private void OnCameraMapSelected(NetEntity netEntity)
++    {
++        if (_mapUid is null || !_entityManager.TryGetComponent<SurveillanceCameraMapComponent>(_mapUid.Value, out var mapComp))
++            return;
++
++        if (!mapComp.Cameras.TryGetValue(netEntity, out var marker) || !marker.Active)
++            return;
++
++        if (!string.IsNullOrEmpty(marker.Address))
++            CameraSelected?.Invoke(marker.Address, marker.Subnet);
++        else
++            _entityManager.RaisePredictiveEvent(new RequestCameraMarkerUpdateMessage(netEntity));
+     }
+ }
+diff --git a/Content.Client/SurveillanceCamera/UI/SurveillanceCameraNavMapControl.cs b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraNavMapControl.cs
+new file mode 100644
+index 0000000000..fd3fd4845f
+--- /dev/null
++++ b/Content.Client/SurveillanceCamera/UI/SurveillanceCameraNavMapControl.cs
+@@ -0,0 +1,129 @@
++using Robust.Client.Graphics;
++using Robust.Client.ResourceManagement;
++using Robust.Shared.Map;
++using Content.Client.Pinpointer.UI;
++using Content.Client.Resources;
++using Content.Shared.SurveillanceCamera.Components;
++
++namespace Content.Client.SurveillanceCamera.UI;
++
++public sealed class SurveillanceCameraNavMapControl : NavMapControl
++{
++    [Dependency] private readonly IEntityManager _entityManager = default!;
++    [Dependency] private readonly IResourceCache _resourceCache = default!;
++
++    private static readonly Color CameraActiveColor = Color.FromHex("#FF00FF");
++    private static readonly Color CameraInactiveColor = Color.FromHex("#a09f9fff");
++    private static readonly Color CameraSelectedColor = Color.FromHex("#fbff19ff");
++    private static readonly Color CameraInvalidColor = Color.FromHex("#fa1f1fff");
++
++    private readonly Texture _activeTexture;
++    private readonly Texture _inactiveTexture;
++    private readonly Texture _selectedTexture;
++    private readonly Texture _invalidTexture;
++
++    private string _activeCameraAddress = string.Empty;
++    private HashSet<string> _availableSubnets = new();
++    private (Dictionary<NetEntity, CameraMarker> Cameras, string ActiveAddress, HashSet<string> AvailableSubnets) _lastState;
++
++    public bool EnableCameraSelection { get; set; }
++
++    public event Action<NetEntity>? CameraSelected;
++
++
++    public SurveillanceCameraNavMapControl()
++    {
++
++        _activeTexture = _resourceCache.GetTexture("/Textures/Interface/NavMap/beveled_triangle.png");
++        _selectedTexture = _activeTexture;
++        _inactiveTexture = _resourceCache.GetTexture("/Textures/Interface/NavMap/beveled_circle.png");
++        _invalidTexture = _resourceCache.GetTexture("/Textures/Interface/NavMap/beveled_square.png");
++
++        TrackedEntitySelectedAction += entity =>
++        {
++            if (entity.HasValue)
++                CameraSelected?.Invoke(entity.Value);
++        };
++    }
++
++    public void SetActiveCameraAddress(string address)
++    {
++        if (_activeCameraAddress == address)
++            return;
++
++        _activeCameraAddress = address;
++        ForceNavMapUpdate();
++    }
++
++    public void SetAvailableSubnets(HashSet<string> subnets)
++    {
++        if (_availableSubnets.SetEquals(subnets))
++            return;
++
++        _availableSubnets = subnets;
++        ForceNavMapUpdate();
++    }
++
++    protected override void UpdateNavMap()
++    {
++        base.UpdateNavMap();
++
++        if (MapUid is null || !_entityManager.TryGetComponent<SurveillanceCameraMapComponent>(MapUid, out var mapComp))
++            return;
++
++        var currentState = (mapComp.Cameras, _activeCameraAddress, _availableSubnets);
++        if (_lastState.Equals(currentState))
++            return;
++
++        _lastState = currentState;
++        UpdateCameraMarkers(mapComp);
++    }
++
++    private void UpdateCameraMarkers(SurveillanceCameraMapComponent mapComp)
++    {
++        TrackedEntities.Clear();
++
++        if (MapUid is null)
++            return;
++
++        foreach (var (netEntity, marker) in mapComp.Cameras)
++        {
++            if (!marker.Visible || !_availableSubnets.Contains(marker.Subnet))
++                continue;
++
++            var coords = new EntityCoordinates(MapUid.Value, marker.Position);
++
++            Texture texture;
++            Color color;
++
++            if (string.IsNullOrEmpty(marker.Address))
++            {
++                color = CameraInvalidColor;
++                texture = _invalidTexture;
++            }
++            else if (marker.Address == _activeCameraAddress)
++            {
++                color = CameraSelectedColor;
++                texture = _selectedTexture;
++            }
++            else if (marker.Active)
++            {
++                color = CameraActiveColor;
++                texture = _activeTexture;
++            }
++            else
++            {
++                color = CameraInactiveColor;
++                texture = _inactiveTexture;
++            }
++
++            TrackedEntities[netEntity] = new NavMapBlip(
++                coords,
++                texture,
++                color,
++                false,
++                EnableCameraSelection
++            );
++        }
++    }
++}
+diff --git a/Content.Server/SurveillanceCamera/CameraMapVisibilityWireAction.cs b/Content.Server/SurveillanceCamera/CameraMapVisibilityWireAction.cs
+new file mode 100644
+index 0000000000..c08c907e6a
+--- /dev/null
++++ b/Content.Server/SurveillanceCamera/CameraMapVisibilityWireAction.cs
+@@ -0,0 +1,37 @@
++using Content.Server.Wires;
++using Content.Shared.Wires;
++
++namespace Content.Server.SurveillanceCamera;
++
++public sealed partial class CameraMapVisibilityWireAction : ComponentWireAction<SurveillanceCameraComponent>
++{
++    private SurveillanceCameraMapSystem _mapSystem => EntityManager.System<SurveillanceCameraMapSystem>();
++
++    public override string Name { get; set; } = "wire-name-camera-map";
++    public override Color Color { get; set; } = Color.Teal;
++    public override object StatusKey => "OnMapVisibility";
++
++    public override StatusLightState? GetLightState(Wire wire, SurveillanceCameraComponent component)
++    {
++        return _mapSystem.IsCameraVisible(wire.Owner)
++            ? StatusLightState.On
++            : StatusLightState.Off;
++    }
++
++    public override bool Cut(EntityUid user, Wire wire, SurveillanceCameraComponent component)
++    {
++        _mapSystem.SetCameraVisibility(wire.Owner, false);
++        return true;
++    }
++
++    public override bool Mend(EntityUid user, Wire wire, SurveillanceCameraComponent component)
++    {
++        _mapSystem.SetCameraVisibility(wire.Owner, true);
++        return true;
++    }
++
++    public override void Pulse(EntityUid user, Wire wire, SurveillanceCameraComponent component)
++    {
++
++    }
++}
+diff --git a/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMapSystem.cs b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMapSystem.cs
+new file mode 100644
+index 0000000000..5c696a10f1
+--- /dev/null
++++ b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMapSystem.cs
+@@ -0,0 +1,138 @@
++using System.Numerics;
++using Content.Server.Power.Components;
++using Content.Shared.DeviceNetwork.Components;
++using Content.Shared.SurveillanceCamera.Components;
++
++namespace Content.Server.SurveillanceCamera;
++
++public sealed class SurveillanceCameraMapSystem : EntitySystem
++{
++    [Dependency] private readonly SharedTransformSystem _transform = default!;
++
++    public override void Initialize()
++    {
++        SubscribeLocalEvent<SurveillanceCameraComponent, ComponentStartup>(OnCameraStartup);
++        SubscribeLocalEvent<SurveillanceCameraComponent, MoveEvent>(OnCameraMoved);
++
++        SubscribeNetworkEvent<RequestCameraMarkerUpdateMessage>(OnRequestCameraMarkerUpdate);
++    }
++    private void OnCameraStartup(EntityUid uid, SurveillanceCameraComponent comp, ComponentStartup args)
++    {
++        UpdateCameraMarker((uid, comp));
++    }
++
++    private void OnCameraMoved(EntityUid uid, SurveillanceCameraComponent comp, ref MoveEvent args)
++    {
++        var oldGridUid = _transform.GetGrid(args.OldPosition);
++        var newGridUid = _transform.GetGrid(args.NewPosition);
++
++        if (oldGridUid != newGridUid && oldGridUid is not null)
++        {
++            if (TryComp<SurveillanceCameraMapComponent>(oldGridUid, out var oldMapComp))
++            {
++                var netEntity = GetNetEntity(uid);
++                if (oldMapComp.Cameras.Remove(netEntity))
++                    Dirty(oldGridUid.Value, oldMapComp);
++            }
++        }
++
++        if (newGridUid is not null)
++            UpdateCameraMarker((uid, comp));
++    }
++
++    private void OnRequestCameraMarkerUpdate(RequestCameraMarkerUpdateMessage args)
++    {
++        var cameraEntity = GetEntity(args.CameraEntity);
++
++        if (TryComp<SurveillanceCameraComponent>(cameraEntity, out var comp)
++            && HasComp<DeviceNetworkComponent>(cameraEntity))
++            UpdateCameraMarker((cameraEntity, comp));
++    }
++
++    /// <summary>
++    /// Updates camera data in the SurveillanceCameraMapComponent for the specified camera entity.
++    /// </summary>
++    public void UpdateCameraMarker(Entity<SurveillanceCameraComponent> camera)
++    {
++        var (uid, comp) = camera;
++
++        if (!TryComp(uid, out TransformComponent? xform) || !TryComp(uid, out DeviceNetworkComponent? deviceNet))
++            return;
++
++        var gridUid = xform.GridUid ?? xform.MapUid;
++        if (gridUid is null)
++            return;
++
++        var netEntity = GetNetEntity(uid);
++
++        var mapComp = EnsureComp<SurveillanceCameraMapComponent>(gridUid.Value);
++        var worldPos = _transform.GetWorldPosition(xform);
++        var gridMatrix = _transform.GetInvWorldMatrix(Transform(gridUid.Value));
++        var localPos = Vector2.Transform(worldPos, gridMatrix);
++
++        var address = deviceNet.Address;
++        var subnet = deviceNet.ReceiveFrequencyId ?? string.Empty;
++        var powered = CompOrNull<ApcPowerReceiverComponent>(uid)?.Powered ?? true;
++        var active = comp.Active && powered;
++
++        bool exists = mapComp.Cameras.TryGetValue(netEntity, out var existing);
++
++        if (exists &&
++            existing.Position.Equals(localPos) &&
++            existing.Active == active &&
++            existing.Address == address &&
++            existing.Subnet == subnet)
++        {
++            return;
++        }
++
++        var visible = exists ? existing.Visible : true;
++
++        mapComp.Cameras[netEntity] = new CameraMarker
++        {
++            Position = localPos,
++            Active = active,
++            Address = address,
++            Subnet = subnet,
++            Visible = visible
++        };
++        Dirty(gridUid.Value, mapComp);
++    }
++
++    /// <summary>
++    /// Sets the visibility state of a camera on the camera map.
++    /// </summary>
++    public void SetCameraVisibility(EntityUid cameraUid, bool visible)
++    {
++        if (!TryComp(cameraUid, out TransformComponent? xform))
++            return;
++
++        var gridUid = xform.GridUid ?? xform.MapUid;
++        if (gridUid == null || !TryComp<SurveillanceCameraMapComponent>(gridUid.Value, out var mapComp))
++            return;
++
++        var netEntity = GetNetEntity(cameraUid);
++        if (mapComp.Cameras.TryGetValue(netEntity, out var marker))
++        {
++            marker.Visible = visible;
++            mapComp.Cameras[netEntity] = marker;
++            Dirty(gridUid.Value, mapComp);
++        }
++    }
++
++    /// <summary>
++    /// Checks if a camera is currently visible on the camera map.
++    /// </summary>
++    public bool IsCameraVisible(EntityUid cameraUid)
++    {
++        if (!TryComp(cameraUid, out TransformComponent? xform))
++            return false;
++
++        var gridUid = xform.GridUid ?? xform.MapUid;
++        if (gridUid == null || !TryComp<SurveillanceCameraMapComponent>(gridUid, out var mapComp))
++            return false;
++
++        var netEntity = GetNetEntity(cameraUid);
++        return mapComp.Cameras.TryGetValue(netEntity, out var marker) && marker.Visible;
++    }
++}
+diff --git a/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMonitorSystem.cs b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMonitorSystem.cs
+index 4f59654bb9..8a68e74855 100644
+--- a/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMonitorSystem.cs
++++ b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraMonitorSystem.cs
+@@ -185,7 +185,7 @@ private void OnSwitchMessage(EntityUid uid, SurveillanceCameraMonitorComponent c
+         // there would be a null check here, but honestly
+         // whichever one is the "latest" switch message gets to
+         // do the switch
+-        TrySwitchCameraByAddress(uid, message.Address, component);
++        TrySwitchCameraByAddress(uid, message.Address, message.CameraSubnet, component);
+     }
+ 
+     private void OnPowerChanged(EntityUid uid, SurveillanceCameraMonitorComponent component, ref PowerChangedEvent args)
+@@ -426,15 +426,18 @@ private void SwitchCamera(EntityUid uid, EntityUid camera, SurveillanceCameraMon
+         UpdateUserInterface(uid, monitor);
+     }
+ 
+-    private void TrySwitchCameraByAddress(EntityUid uid, string address,
+-        SurveillanceCameraMonitorComponent? monitor = null)
++    private void TrySwitchCameraByAddress(EntityUid uid, string address, string? cameraSubnet = null, SurveillanceCameraMonitorComponent? monitor = null)
+     {
+-        if (!Resolve(uid, ref monitor)
+-            || string.IsNullOrEmpty(monitor.ActiveSubnet)
+-            || !monitor.KnownSubnets.TryGetValue(monitor.ActiveSubnet, out var subnetAddress))
+-        {
++        if (!Resolve(uid, ref monitor))
++            return;
++
++        if (cameraSubnet != null && cameraSubnet != monitor.ActiveSubnet)
++            SetActiveSubnet(uid, cameraSubnet, monitor);
++
++        var activeSubnet = monitor.ActiveSubnet;
++
++        if (string.IsNullOrEmpty(activeSubnet) || !monitor.KnownSubnets.TryGetValue(activeSubnet, out var subnetAddress))
+             return;
+-        }
+ 
+         var payload = new NetworkPayload()
+         {
+diff --git a/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraSystem.cs b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraSystem.cs
+index 2a288d9017..08cd64e3d8 100644
+--- a/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraSystem.cs
++++ b/Content.Server/SurveillanceCamera/Systems/SurveillanceCameraSystem.cs
+@@ -24,7 +24,7 @@ public sealed class SurveillanceCameraSystem : EntitySystem
+     [Dependency] private readonly UserInterfaceSystem _userInterface = default!;
+     [Dependency] private readonly SharedAppearanceSystem _appearance = default!;
+     [Dependency] private readonly IAdminLogManager _adminLogger = default!;
+-
++    [Dependency] private readonly SurveillanceCameraMapSystem _cameraMapSystem = default!;
+ 
+     // Pings a surveillance camera subnet. All cameras will always respond
+     // with a data message if they are on the same subnet.
+@@ -292,6 +292,8 @@ public void SetActive(EntityUid camera, bool setting, SurveillanceCameraComponen
+         }
+ 
+         UpdateVisuals(camera, component);
++
++        _cameraMapSystem.UpdateCameraMarker((camera, component));
+     }
+ 
+     public void AddActiveViewer(EntityUid camera, EntityUid player, EntityUid? monitor = null, SurveillanceCameraComponent? component = null, ActorComponent? actor = null)
+diff --git a/Content.Shared/SurveillanceCamera/Components/SurveillanceCameraMapComponent.cs b/Content.Shared/SurveillanceCamera/Components/SurveillanceCameraMapComponent.cs
+new file mode 100644
+index 0000000000..b2f575380e
+--- /dev/null
++++ b/Content.Shared/SurveillanceCamera/Components/SurveillanceCameraMapComponent.cs
+@@ -0,0 +1,64 @@
++using System.Numerics;
++using Robust.Shared.GameStates;
++using Robust.Shared.Serialization;
++
++namespace Content.Shared.SurveillanceCamera.Components;
++
++/// <summary>
++/// Stores surveillance camera data for the camera map.
++/// </summary>
++[RegisterComponent, NetworkedComponent, AutoGenerateComponentState]
++public sealed partial class SurveillanceCameraMapComponent : Component
++{
++    /// <summary>
++    /// Dictionary of cameras on on the current grid.
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public Dictionary<NetEntity, CameraMarker> Cameras = new();
++}
++
++/// <summary>
++/// Represents a camera marker on the camera map.
++/// </summary>
++[Serializable, NetSerializable, DataDefinition]
++public partial struct CameraMarker
++{
++    /// <summary>
++    /// Position of the camera in local map coordinates.
++    /// </summary>
++    [DataField]
++    public Vector2 Position;
++
++    /// <summary>
++    /// Whether the camera is active.
++    /// </summary>
++    [DataField]
++    public bool Active;
++
++    /// <summary>
++    /// Network address of the camera.
++    /// </summary>
++    [DataField]
++    public string Address;
++
++    /// <summary>
++    /// Subnet the camera is connected to.
++    /// </summary>
++    [DataField]
++    public string Subnet;
++
++    /// <summary>
++    /// Should the camera be displayed on the camera map.
++    /// </summary>
++    [DataField]
++    public bool Visible = true;
++}
++
++/// <summary>
++/// Network event for requesting camera marker updates.
++/// </summary>
++[Serializable, NetSerializable]
++public sealed class RequestCameraMarkerUpdateMessage(NetEntity cameraEntity) : EntityEventArgs
++{
++    public NetEntity CameraEntity { get; } = cameraEntity;
++}
+diff --git a/Content.Shared/SurveillanceCamera/SharedSurveillanceCameraMonitorSystem.cs b/Content.Shared/SurveillanceCamera/SharedSurveillanceCameraMonitorSystem.cs
+index aa03e7aee9..1a71d32575 100644
+--- a/Content.Shared/SurveillanceCamera/SharedSurveillanceCameraMonitorSystem.cs
++++ b/Content.Shared/SurveillanceCamera/SharedSurveillanceCameraMonitorSystem.cs
+@@ -39,10 +39,12 @@ public SurveillanceCameraMonitorUiState(NetEntity? activeCamera, HashSet<string>
+ public sealed class SurveillanceCameraMonitorSwitchMessage : BoundUserInterfaceMessage
+ {
+     public string Address { get; }
++    public string? CameraSubnet { get; }
+ 
+-    public SurveillanceCameraMonitorSwitchMessage(string address)
++    public SurveillanceCameraMonitorSwitchMessage(string address, string? cameraSubnet = null)
+     {
+         Address = address;
++        CameraSubnet = cameraSubnet;
+     }
+ }
+ 
+diff --git a/Resources/Locale/en-US/surveillance-camera/surveillance-camera-ui.ftl b/Resources/Locale/en-US/surveillance-camera/surveillance-camera-ui.ftl
+index 9cb32b6eaf..79cdd6487f 100644
+--- a/Resources/Locale/en-US/surveillance-camera/surveillance-camera-ui.ftl
++++ b/Resources/Locale/en-US/surveillance-camera/surveillance-camera-ui.ftl
+@@ -7,7 +7,14 @@ surveillance-camera-monitor-ui-status-connecting = Connecting:
+ surveillance-camera-monitor-ui-status-connected = Connected:
+ surveillance-camera-monitor-ui-status-disconnected = Disconnected
+ surveillance-camera-monitor-ui-no-subnets = No Subnets
++surveillance-camera-monitor-ui-tab-list = List
++surveillance-camera-monitor-ui-tab-map = Map
++surveillance-camera-monitor-ui-legend-active = Active
++surveillance-camera-monitor-ui-legend-inactive = Inactive
++surveillance-camera-monitor-ui-legend-selected = Selected
++surveillance-camera-monitor-ui-legend-invalid = Invalid
+ 
+ surveillance-camera-setup = Setup
+ surveillance-camera-setup-ui-set = Set
+ 
++wire-name-camera-map = MAP
+diff --git a/Resources/Prototypes/Wires/layouts.yml b/Resources/Prototypes/Wires/layouts.yml
+index 675dd16b1c..2dce550649 100644
+--- a/Resources/Prototypes/Wires/layouts.yml
++++ b/Resources/Prototypes/Wires/layouts.yml
+@@ -111,6 +111,7 @@
+   wires:
+   - !type:PowerWireAction
+   - !type:AiVisionWireAction
++  - !type:CameraMapVisibilityWireAction
+ 
+ - type: wireLayout
+   id: CryoPod

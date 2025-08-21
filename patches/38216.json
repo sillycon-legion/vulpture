@@ -1,0 +1,13 @@
+{
+    "pr_number": 38216,
+    "commit": "c02d41b7144bd7bdfca591a2e748a3508ad374c5",
+    "changelog": {
+        "author": "ruddygreat",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Added organisational capabilities to the cargo bounty computer."
+            }
+        ]
+    }
+}

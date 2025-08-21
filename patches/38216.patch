@@ -1,0 +1,297 @@
+diff --git a/Content.Client/Cargo/BUI/CargoBountyConsoleBoundUserInterface.cs b/Content.Client/Cargo/BUI/CargoBountyConsoleBoundUserInterface.cs
+index 04075000f5..8e29142bdc 100644
+--- a/Content.Client/Cargo/BUI/CargoBountyConsoleBoundUserInterface.cs
++++ b/Content.Client/Cargo/BUI/CargoBountyConsoleBoundUserInterface.cs
+@@ -30,6 +30,16 @@ protected override void Open()
+         {
+             SendMessage(new BountySkipMessage(id));
+         };
++
++        _menu.OnClaimButtonPressed += id =>
++        {
++            SendMessage(new BountyClaimedMessage(id));
++        };
++
++        _menu.OnStatusOptionSelected += (id, status) =>
++        {
++            SendMessage(new BountySetStatusMessage(id, status));
++        };
+     }
+ 
+     protected override void UpdateState(BoundUserInterfaceState message)
+diff --git a/Content.Client/Cargo/UI/BountyEntry.xaml b/Content.Client/Cargo/UI/BountyEntry.xaml
+index 7c61323bd5..92f01e0e13 100644
+--- a/Content.Client/Cargo/UI/BountyEntry.xaml
++++ b/Content.Client/Cargo/UI/BountyEntry.xaml
+@@ -10,6 +10,8 @@
+                 <BoxContainer Orientation="Vertical" HorizontalExpand="True">
+                     <RichTextLabel Name="RewardLabel"/>
+                     <RichTextLabel Name="ManifestLabel"/>
++                    <RichTextLabel Name="ClaimedBylabel"/>
++                    <RichTextLabel Name="StatusLabel"/>
+                 </BoxContainer>
+                 <Control MinWidth="10"/>
+                 <BoxContainer Orientation="Vertical" MinWidth="120">
+@@ -17,14 +19,22 @@
+                         <Button Name="PrintButton"
+                                 Text="{Loc 'bounty-console-label-button-text'}"
+                                 HorizontalExpand="False"
+-                                HorizontalAlignment="Right"
+-                                StyleClasses="OpenRight"/>
++                                StyleClasses="OpenBoth"/>
+                         <Button Name="SkipButton"
+                                 Text="{Loc 'bounty-console-skip-button-text'}"
+-                                HorizontalExpand="False"
+-                                HorizontalAlignment="Right"
++                                HorizontalExpand="True"
+                                 StyleClasses="OpenLeft"/>
+                     </BoxContainer>
++                    <BoxContainer Orientation="Horizontal" MinWidth="120">
++                        <Button Name="ClaimButton"
++                                Text= "{Loc 'bounty-console-claim-button-text'}"
++                                HorizontalExpand="False"
++                                StyleClasses="OpenRight"/>
++                        <OptionButton Name="BountyStatusSelector"
++                                      Access="Public"
++                                      StyleClasses="OpenBoth"
++                                      HorizontalExpand="True"/>
++                    </BoxContainer>
+                     <RichTextLabel Name="IdLabel" HorizontalAlignment="Right" Margin="0 0 5 0"/>
+                 </BoxContainer>
+             </BoxContainer>
+diff --git a/Content.Client/Cargo/UI/BountyEntry.xaml.cs b/Content.Client/Cargo/UI/BountyEntry.xaml.cs
+index 027d7b3e80..b8594ee31d 100644
+--- a/Content.Client/Cargo/UI/BountyEntry.xaml.cs
++++ b/Content.Client/Cargo/UI/BountyEntry.xaml.cs
+@@ -18,6 +18,8 @@ public sealed partial class BountyEntry : BoxContainer
+ 
+     public Action? OnLabelButtonPressed;
+     public Action? OnSkipButtonPressed;
++    public Action? OnClaimButtonPressed;
++    public Action? OnStatusOptionSelected;
+ 
+     public TimeSpan EndTime;
+     public TimeSpan UntilNextSkip;
+@@ -46,6 +48,17 @@ public BountyEntry(CargoBountyData bounty, TimeSpan untilNextSkip)
+ 
+         PrintButton.OnPressed += _ => OnLabelButtonPressed?.Invoke();
+         SkipButton.OnPressed += _ => OnSkipButtonPressed?.Invoke();
++
++        ClaimButton.OnPressed += _ => OnClaimButtonPressed?.Invoke();
++        BountyStatusSelector.AddItem(Loc.GetString("bounty-console-status", ("status", 0)), 0);
++        BountyStatusSelector.AddItem(Loc.GetString("bounty-console-status", ("status", 1)), 1);
++        BountyStatusSelector.AddItem(Loc.GetString("bounty-console-status", ("status", 2)), 2);
++        BountyStatusSelector.Select((int) bounty.Status);
++        BountyStatusSelector.ToolTip = Loc.GetString("bounty-console-status-tooltip", ("status", (int) bounty.Status));
++
++        var claimedByText = string.IsNullOrEmpty(bounty.ClaimedBy) ? Loc.GetString("bounty-console-claimed-by-none") : bounty.ClaimedBy;
++        ClaimedBylabel.SetMarkup(Loc.GetString("bounty-console-claimed-by", ("claimant", claimedByText)));
++        StatusLabel.SetMarkup(Loc.GetString("bounty-console-status-label", ("status", (int) bounty.Status)));
+     }
+ 
+     private void UpdateSkipButton(float deltaSeconds)
+diff --git a/Content.Client/Cargo/UI/CargoBountyMenu.xaml.cs b/Content.Client/Cargo/UI/CargoBountyMenu.xaml.cs
+index c289fb6ed8..0e973348bb 100644
+--- a/Content.Client/Cargo/UI/CargoBountyMenu.xaml.cs
++++ b/Content.Client/Cargo/UI/CargoBountyMenu.xaml.cs
+@@ -11,6 +11,8 @@ public sealed partial class CargoBountyMenu : FancyWindow
+ {
+     public Action<string>? OnLabelButtonPressed;
+     public Action<string>? OnSkipButtonPressed;
++    public Action<string>? OnClaimButtonPressed;
++    public Action<string, int>? OnStatusOptionSelected;
+ 
+     public CargoBountyMenu()
+     {
+@@ -28,6 +30,8 @@ public void UpdateEntries(List<CargoBountyData> bounties, List<CargoBountyHistor
+             var entry = new BountyEntry(b, untilNextSkip);
+             entry.OnLabelButtonPressed += () => OnLabelButtonPressed?.Invoke(b.Id);
+             entry.OnSkipButtonPressed += () => OnSkipButtonPressed?.Invoke(b.Id);
++            entry.OnClaimButtonPressed += () => OnClaimButtonPressed?.Invoke(b.Id);
++            entry.BountyStatusSelector.OnItemSelected += args => OnStatusOptionSelected?.Invoke(b.Id, args.Id);
+ 
+             BountyEntriesContainer.AddChild(entry);
+         }
+diff --git a/Content.Server/Cargo/Systems/CargoSystem.Bounty.cs b/Content.Server/Cargo/Systems/CargoSystem.Bounty.cs
+index 934517eadc..2e76526d73 100644
+--- a/Content.Server/Cargo/Systems/CargoSystem.Bounty.cs
++++ b/Content.Server/Cargo/Systems/CargoSystem.Bounty.cs
+@@ -1,5 +1,6 @@
+ using System.Diagnostics.CodeAnalysis;
+ using System.Linq;
++using Content.Server.Access.Systems;
+ using Content.Server.Cargo.Components;
+ using Content.Server.NameIdentifier;
+ using Content.Shared.Access.Components;
+@@ -28,6 +29,7 @@ public sealed partial class CargoSystem
+     [Dependency] private readonly ContainerSystem _container = default!;
+     [Dependency] private readonly NameIdentifierSystem _nameIdentifier = default!;
+     [Dependency] private readonly EntityWhitelistSystem _whitelistSys = default!;
++    [Dependency] private readonly IdCardSystem _idCard = default!;
+ 
+     private static readonly ProtoId<NameIdentifierGroupPrototype> BountyNameIdentifierGroup = "Bounty";
+ 
+@@ -40,6 +42,8 @@ private void InitializeBounty()
+         SubscribeLocalEvent<CargoBountyConsoleComponent, BoundUIOpenedEvent>(OnBountyConsoleOpened);
+         SubscribeLocalEvent<CargoBountyConsoleComponent, BountyPrintLabelMessage>(OnPrintLabelMessage);
+         SubscribeLocalEvent<CargoBountyConsoleComponent, BountySkipMessage>(OnSkipBountyMessage);
++        SubscribeLocalEvent<CargoBountyConsoleComponent, BountyClaimedMessage>(OnBountyClaimedMessage);
++        SubscribeLocalEvent<CargoBountyConsoleComponent, BountySetStatusMessage>(OnSetBountyStatusMessage);
+         SubscribeLocalEvent<CargoBountyLabelComponent, PriceCalculationEvent>(OnGetBountyPrice);
+         SubscribeLocalEvent<EntitySoldEvent>(OnSold);
+         SubscribeLocalEvent<StationCargoBountyDatabaseComponent, MapInitEvent>(OnMapInit);
+@@ -111,6 +115,70 @@ private void OnSkipBountyMessage(EntityUid uid, CargoBountyConsoleComponent comp
+         _audio.PlayPvs(component.SkipSound, uid);
+     }
+ 
++        private void OnSetBountyStatusMessage(Entity<CargoBountyConsoleComponent> ent, ref BountySetStatusMessage args)
++    {
++        if (_station.GetOwningStation(ent.Owner) is not { } station || !TryComp<StationCargoBountyDatabaseComponent>(station, out var bountyDbComp))
++            return;
++
++        for (var i = 0; i < bountyDbComp.Bounties.Count; i++)
++        {
++            var bounty = bountyDbComp.Bounties[i];
++
++            if (bounty.Id != args.BountyId)
++                continue;
++
++            var newData = new CargoBountyData
++            {
++                Id = bounty.Id,
++                Bounty = bounty.Bounty,
++                ClaimedBy = bounty.ClaimedBy,
++                Status = (CargoBountyStatus)args.Status,
++            };
++
++            bountyDbComp.Bounties[i] = newData;
++        }
++
++        var untilNextSkip = bountyDbComp.NextSkipTime - Timing.CurTime;
++        _uiSystem.SetUiState(ent.Owner, CargoConsoleUiKey.Bounty, new CargoBountyConsoleState(bountyDbComp.Bounties, bountyDbComp.History, untilNextSkip));
++    }
++
++    private void OnBountyClaimedMessage(Entity<CargoBountyConsoleComponent> ent, ref BountyClaimedMessage args)
++    {
++        if (_station.GetOwningStation(ent.Owner) is not { } station || !TryComp<StationCargoBountyDatabaseComponent>(station, out var bountyDbComp))
++            return;
++
++        for (var i = 0; i < bountyDbComp.Bounties.Count; i++)
++        {
++            var bounty = bountyDbComp.Bounties[i];
++
++            if (bounty.Id != args.BountyId)
++                continue;
++
++            string name;
++            if (_idCard.TryFindIdCard(args.Actor, out var idCard) && idCard.Comp.FullName != null)
++            {
++                name = idCard.Comp.FullName;
++            }
++            else
++            {
++                name = Loc.GetString("bounty-console-claimed-by-unknown");
++            }
++
++            var newData = new CargoBountyData
++            {
++                Id = bounty.Id,
++                Bounty = bounty.Bounty,
++                ClaimedBy = name.Equals(bounty.ClaimedBy) ? string.Empty : name,
++                Status = bounty.Status,
++            };
++
++            bountyDbComp.Bounties[i] = newData;
++        }
++
++        var untilNextSkip = bountyDbComp.NextSkipTime - Timing.CurTime;
++        _uiSystem.SetUiState(ent.Owner, CargoConsoleUiKey.Bounty, new CargoBountyConsoleState(bountyDbComp.Bounties, bountyDbComp.History, untilNextSkip));
++    }
++
+     public void SetupBountyLabel(EntityUid uid, EntityUid stationId, CargoBountyData bounty, PaperComponent? paper = null, CargoBountyLabelComponent? label = null)
+     {
+         if (!Resolve(uid, ref paper, ref label) || !_protoMan.TryIndex<CargoBountyPrototype>(bounty.Bounty, out var prototype))
+diff --git a/Content.Shared/Cargo/CargoBountyData.cs b/Content.Shared/Cargo/CargoBountyData.cs
+index 3de49b5754..4681a8fad0 100644
+--- a/Content.Shared/Cargo/CargoBountyData.cs
++++ b/Content.Shared/Cargo/CargoBountyData.cs
+@@ -28,4 +28,17 @@ public CargoBountyData(CargoBountyPrototype bounty, int uniqueIdentifier)
+         Bounty = bounty.ID;
+         Id = $"{bounty.IdPrefix}{uniqueIdentifier:D3}";
+     }
++
++    [DataField]
++    public string ClaimedBy { get; init; } = string.Empty;
++
++    [DataField]
++    public CargoBountyStatus Status { get; init; } = CargoBountyStatus.Undelivered;
++}
++
++public enum CargoBountyStatus
++{
++    Undelivered,
++    Waiting,
++    OnShuttle,
+ }
+diff --git a/Content.Shared/Cargo/Components/CargoBountyConsoleComponent.cs b/Content.Shared/Cargo/Components/CargoBountyConsoleComponent.cs
+index dd01954d62..ad6ed76baf 100644
+--- a/Content.Shared/Cargo/Components/CargoBountyConsoleComponent.cs
++++ b/Content.Shared/Cargo/Components/CargoBountyConsoleComponent.cs
+@@ -94,3 +94,27 @@ public BountySkipMessage(string bountyId)
+         BountyId = bountyId;
+     }
+ }
++
++[Serializable, NetSerializable]
++public sealed class BountyClaimedMessage : BoundUserInterfaceMessage
++{
++    public string BountyId;
++
++    public BountyClaimedMessage(string bountyId)
++    {
++        BountyId = bountyId;
++    }
++}
++
++[Serializable, NetSerializable]
++public sealed class BountySetStatusMessage : BoundUserInterfaceMessage
++{
++    public string BountyId;
++    public int Status;
++
++    public BountySetStatusMessage(string bountyId, int status)
++    {
++        BountyId = bountyId;
++        Status = status;
++    }
++}
+diff --git a/Resources/Locale/en-US/cargo/cargo-bounty-console.ftl b/Resources/Locale/en-US/cargo/cargo-bounty-console.ftl
+index d7a7025927..cde44f6e35 100644
+--- a/Resources/Locale/en-US/cargo/cargo-bounty-console.ftl
++++ b/Resources/Locale/en-US/cargo/cargo-bounty-console.ftl
+@@ -11,6 +11,25 @@ bounty-console-manifest-entry =
+     }
+ bounty-console-manifest-reward = Reward: ${$reward}
+ bounty-console-description-label = [color=gray]{$description}[/color]
++bounty-console-claim-button-text = Claim
++bounty-console-claimed-by-none = None
++bounty-console-claimed-by-unknown = Unknown
++bounty-console-claimed-by = Claimed by: {$claimant}
++bounty-console-status-label = Status: {$status ->
++        [2] [color=limegreen]On Shuttle[/color]
++        [1] Waiting
++        *[other] [color=orange]Undelivered[/color]
++    }
++bounty-console-status = {$status ->
++        [2] On Shuttle
++        [1] Waiting
++        *[other] Undelivered
++    }
++bounty-console-status-tooltip = {$status ->
++    [2] This bounty is on the shuttle, ready to be delivered to the trade station
++    [1] This bounty is waiting to be fulfilled
++    *[other] This bounty has not yet been sent out for fulfilment
++    }
+ bounty-console-id-label = ID#{$id}
+ 
+ bounty-console-flavor-left = Bounties sourced from local unscrupulous dealers.
