@@ -3,7 +3,6 @@ import glob
 import shutil
 import os
 import json
-import publish_multi_request
 
 if os.path.isdir("src"):
     shutil.rmtree("src")
@@ -54,5 +53,7 @@ subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--
 subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "client", "--no-wipe-release"], cwd="src", check=True)
 shutil.move("src/release", "release")
 
-publish_multi_request.publish(get_version(), get_engine_version())
+if "PUBLISH_TOKEN" in os.environ:
+    import publish_multi_request
+    publish_multi_request.publish(get_version(), get_engine_version())
 shutil.rmtree("src")
