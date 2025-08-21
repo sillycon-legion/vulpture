@@ -1,0 +1,17 @@
+{
+    "pr_number": [35842, 39351],
+    "commit": ["195e6cc6010d3713289e4e0589353bb04c57ca5d", "dcdf00c460cc8192b5ea1d69ca6a12c5f05ae650"],
+    "changelog": {
+        "author": "Tiniest Shark",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Added unique tail sprites to Hard/Softsuits for reptilians!"
+            },
+            {
+                "type": "Add",
+                "message": "Reptilians now have Mask/Helmet displacements. Snoots are no longer smushed."
+            }
+        ]
+    }
+}
