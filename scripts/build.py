@@ -19,12 +19,12 @@ def get_engine_version() -> str:
     return tag[1:] # Cut off v prefix.
 
 def get_ss14_version() -> str:
-    proc = subprocess.run(["git", "rev-parse", "HEAD", "--verify"], stdout=subprocess.PIPE, cwd="src", check=True, encoding="UTF-8")
+    proc = subprocess.run(["git", "rev-parse", "HEAD"], stdout=subprocess.PIPE, cwd="src", check=True, encoding="UTF-8")
     tag = proc.stdout.strip()
     return tag
 
 def get_vulpture_version() -> str:
-    proc = subprocess.run(["git", "rev-parse", "HEAD", "--verify"], stdout=subprocess.PIPE, check=True, encoding="UTF-8")
+    proc = subprocess.run(["git", "rev-parse", "HEAD"], stdout=subprocess.PIPE, check=True, encoding="UTF-8")
     tag = proc.stdout.strip()
     return tag
 
