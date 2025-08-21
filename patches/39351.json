@@ -1,0 +1,13 @@
+{
+    "pr_number": 39351,
+    "commit": "dcdf00c460cc8192b5ea1d69ca6a12c5f05ae650",
+    "changelog": {
+        "author": "Tiniest Shark",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Reptilians now have Mask/Helmet displacements. Snoots are no longer smushed."
+            }
+        ]
+    }
+}

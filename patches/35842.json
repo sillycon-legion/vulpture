@@ -1,0 +1,13 @@
+{
+    "pr_number": 35842,
+    "commit": "195e6cc6010d3713289e4e0589353bb04c57ca5d",
+    "changelog": {
+        "author": "Tiniest Shark",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Added unique tail sprites to Hard/Softsuits for reptilians!"
+            }
+        ]
+    }
+}
