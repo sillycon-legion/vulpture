@@ -1,0 +1,12 @@
+diff --git a/Resources/Locale/en-US/changelog/changelog-window.ftl b/Resources/Locale/en-US/changelog/changelog-window.ftl
+index 4ee5552282..c42861500f 100644
+--- a/Resources/Locale/en-US/changelog/changelog-window.ftl
++++ b/Resources/Locale/en-US/changelog/changelog-window.ftl
+@@ -14,6 +14,7 @@ changelog-button-new-entries = Changelog (new!)
+ changelog-tab-title-Changelog = Changelog
+ changelog-tab-title-Admin = Admin
+ changelog-tab-title-Maps = Maps
++changelog-tab-title-Patches = Downstream Patches
+ 
+ cmd-changelog-desc = Opens the changelog.
+ cmd-changelog-help = Usage: changelog

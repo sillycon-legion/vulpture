@@ -31,15 +31,21 @@ def get_vulpture_version() -> str:
 def get_version() -> str:
     return get_vulpture_version() + "-orig-" + get_ss14_version()
 
+changelog = {"Order": -1, "Entries": []}
+
 for patch in glob.glob("patches/*.json"):
     patchid = patch[8:-5]
     with open(patch) as f:
         patchmeta = json.load(f)
         if "changelog" in patchmeta:
-            with open(f"src/Resources/Changelog/Parts/{patchid}.yml", "w") as cl:
-                json.dump(patchmeta["changelog"], cl)
+            changelog["Entries"].append(patchmeta["changelog"])
         subprocess.run(["git", "apply", f"../patches/{patchid}.patch"], cwd="src", check=True)
         print(f"applied patch {patchid}")
+
+if len(changelog["Entries"]) > 0:
+    subprocess.run(["git", "apply", "../scripts/changelog.patch"], cwd="src", check=True)
+    with open("src/Resources/Changelog/Patches.yml", "w") as cl:
+        json.dump(changelog, cl)
 
 subprocess.run(["dotnet", "restore"], cwd="src", check=True)
 subprocess.run(["dotnet", "build", "Content.Packaging", "--configuration", "Release", "--no-restore", "/m"], cwd="src", check=True)
