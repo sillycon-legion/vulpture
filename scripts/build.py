@@ -9,7 +9,7 @@ if os.path.isdir("src"):
 if os.path.isdir("release"):
     shutil.rmtree("release")
 
-subprocess.run(["git", "clone", "--recursive", "--depth", "1", "https://github.com/space-wizards/space-station-14.git", "src"], check=True)
+subprocess.run(["git", "clone", "--recursive", "https://github.com/space-wizards/space-station-14.git", "src"], check=True)
 
 def get_engine_version() -> str:
     proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0"], stdout=subprocess.PIPE, cwd="src/RobustToolbox", check=True, encoding="UTF-8")
@@ -38,7 +38,7 @@ for patch in glob.glob("patches/*.json"):
         patchmeta = json.load(f)
         if "changelog" in patchmeta:
             changelog["Entries"].append(patchmeta["changelog"])
-        subprocess.run(["git", "apply", f"../patches/{patchid}.patch"], cwd="src", check=True)
+        subprocess.run(["git", "apply", "--3way", f"../patches/{patchid}.patch"], cwd="src", check=True)
         print(f"applied patch {patchid}")
 
 if len(changelog["Entries"]) > 0:
