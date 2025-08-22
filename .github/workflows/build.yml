@@ -21,6 +21,6 @@ jobs:
       with:
         dotnet-version: 9.0.x
     - name: Publish version
-      run: scripts/build.py
+      run: python3 scripts/build.py
       env:
         PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
