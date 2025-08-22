@@ -1,0 +1,2235 @@
+diff --git a/Content.Client/Administration/UI/CustomControls/HSeparator.cs b/Content.Client/Administration/UI/CustomControls/HSeparator.cs
+index 2dfb0b27fe..91828c4f17 100644
+--- a/Content.Client/Administration/UI/CustomControls/HSeparator.cs
++++ b/Content.Client/Administration/UI/CustomControls/HSeparator.cs
+@@ -9,16 +9,24 @@ public sealed class HSeparator : Control
+ {
+     private static readonly Color SeparatorColor = Color.FromHex("#3D4059");
+ 
++    private readonly StyleBoxFlat _styleBox;
++
++    public Color Color
++    {
++        get => _styleBox.BackgroundColor;
++        set => _styleBox.BackgroundColor = value;
++    }
++
+     public HSeparator(Color color)
+     {
+-        AddChild(new PanelContainer
++        _styleBox = new StyleBoxFlat
+         {
+-            PanelOverride = new StyleBoxFlat
+-            {
+-                BackgroundColor = color,
+-                ContentMarginBottomOverride = 2, ContentMarginLeftOverride = 2
+-            }
+-        });
++            BackgroundColor = color,
++            ContentMarginBottomOverride = 2,
++            ContentMarginLeftOverride = 2
++        };
++
++        AddChild(new PanelContainer { PanelOverride = _styleBox });
+     }
+ 
+     public HSeparator() : this(SeparatorColor) { }
+diff --git a/Content.Client/MassDriver/UI/MassDriverConsoleBoundUserInterface.cs b/Content.Client/MassDriver/UI/MassDriverConsoleBoundUserInterface.cs
+new file mode 100644
+index 0000000000..f58f9e4d51
+--- /dev/null
++++ b/Content.Client/MassDriver/UI/MassDriverConsoleBoundUserInterface.cs
+@@ -0,0 +1,42 @@
++using Content.Shared.MassDriver;
++using JetBrains.Annotations;
++using Robust.Client.UserInterface;
++
++namespace Content.Client.MassDriver.UI;
++
++[UsedImplicitly]
++public sealed class MassDriverConsoleBoundUserInterface : BoundUserInterface
++{
++    [ViewVariables]
++    private MassDriverConsoleMenu? _menu;
++
++    public MassDriverConsoleBoundUserInterface(EntityUid owner, Enum uiKey) : base(owner, uiKey)
++    {
++    }
++
++    protected override void Open()
++    {
++        base.Open();
++
++        _menu = this.CreateWindow<MassDriverConsoleMenu>();
++
++        _menu.OnLaunchButtonPressed += () => SendMessage(new MassDriverLaunchMessage());
++
++        _menu.OnModeButtonPressed += i => SendMessage(new MassDriverModeMessage(i));
++
++        _menu.OnThrowDistance += i => SendMessage(new MassDriverThrowDistanceMessage(i));
++
++        _menu.OnThrowSpeed += i => SendMessage(new MassDriverThrowSpeedMessage(i));
++    }
++
++    protected override void UpdateState(BoundUserInterfaceState state)
++    {
++        base.UpdateState(state);
++
++        if (_menu == null)
++            return;
++
++        if (state is MassDriverUiState massDriverUiState)
++            _menu.UpdateState(massDriverUiState);
++    }
++}
+diff --git a/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml b/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml
+new file mode 100644
+index 0000000000..9a8af116cf
+--- /dev/null
++++ b/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml
+@@ -0,0 +1,54 @@
++<DefaultWindow xmlns="https://spacestation14.io"
++            xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client"
++            xmlns:cc="clr-namespace:Content.Client.Administration.UI.CustomControls"
++            Title="{Loc 'mass-driver-ui-title'}"
++            MinSize="325 300"
++            SetSize="325 300">
++    <BoxContainer Orientation="Vertical" HorizontalExpand="True" VerticalExpand="True">
++        <ScrollContainer VScrollEnabled="True" HorizontalExpand="True" VerticalExpand="True">
++            <BoxContainer Orientation="Vertical">
++                <!-- Mass Driver Mode -->
++                <RichTextLabel Name="MassDriverModeLabel" Text="{Loc 'mass-driver-ui-mass-driver-modes-label'}" />
++                <BoxContainer Orientation="Horizontal" HorizontalExpand="True">
++                    <Button Name="AutoModeButton" Access="Public" Text="{Loc 'mass-driver-ui-auto-mode'}" HorizontalExpand="True" StyleClasses="OpenBoth" />
++                    <Button Name="ManualModeButton" Access="Public" Text="{Loc 'mass-driver-ui-manual-mode'}" HorizontalExpand="True" StyleClasses="OpenBoth" />
++                </BoxContainer>
++                <cc:HSeparator Color="#a81b22" Margin="0 10 0 10" />
++                <!-- Mass Driver Throw Distance -->
++                <BoxContainer Orientation="Vertical">
++                    <BoxContainer Orientation="Horizontal">
++                        <Label Text="{Loc 'mass-driver-ui-throw-distance-current'}" StyleClasses="StatusFieldTitle" />
++                        <Label Name="ThrowDistanceCurrentValue" Margin="5 0 0 0" />
++                    </BoxContainer>
++                    <BoxContainer Orientation="Horizontal" HorizontalExpand="True" VerticalAlignment="Center">
++                        <Label Name="ThrowDistanceMinValue" Margin="0 0 5 0" StyleClasses="StatusFieldTitle" />          
++                        <Slider Name="ThrowDistanceSlider" HorizontalExpand="True" />
++                        <Label Name="ThrowDistanceMaxValue" Margin="5 0 0 0" StyleClasses="StatusFieldTitle" />
++                    </BoxContainer>
++                </BoxContainer>
++                <!-- Mass Driver Throw Speed -->
++                <BoxContainer Orientation="Vertical" Margin="0 10 0 0">
++                    <BoxContainer Orientation="Horizontal">
++                        <Label Text="{Loc 'mass-driver-ui-throw-speed-current'}" StyleClasses="StatusFieldTitle" />
++                        <Label Name="ThrowSpeedCurrentValue" Margin="5 0 0 0" />
++                    </BoxContainer>
++                    <BoxContainer Orientation="Horizontal" HorizontalExpand="True" VerticalAlignment="Center">
++                        <Label Name="ThrowSpeedMinValue" Margin="0 0 5 0" StyleClasses="StatusFieldTitle" />          
++                        <Slider Name="ThrowSpeedSlider" HorizontalExpand="True" />
++                        <Label Name="ThrowSpeedMaxValue" Margin="5 0 0 0" StyleClasses="StatusFieldTitle" />
++                    </BoxContainer>
++                </BoxContainer>
++                <cc:HSeparator Color="#a81b22" Margin="0 10 0 10" />
++                <!-- Mass Driver Throw Button -->
++                <Button Name="LaunchButton" VerticalAlignment="Center" Access="Public" Text="{Loc 'mass-driver-ui-launch'}" HorizontalExpand="True" StyleClasses="OpenBoth" />
++            </BoxContainer>
++        </ScrollContainer>
++    </BoxContainer>
++    <PanelContainer Name="DisabledPanel" Access="Public" HorizontalExpand="True"
++                    VerticalExpand="True" Visible="False">
++        <PanelContainer.PanelOverride>
++            <gfx:StyleBoxFlat BackgroundColor="#000000BF" />
++        </PanelContainer.PanelOverride>
++        <RichTextLabel Name="DisabledLabel" Access="Public" HorizontalAlignment="Center" />
++    </PanelContainer>
++</DefaultWindow>
+\ No newline at end of file
+diff --git a/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml.cs b/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml.cs
+new file mode 100644
+index 0000000000..3b5d213fc6
+--- /dev/null
++++ b/Content.Client/MassDriver/UI/MassDriverConsoleMenu.xaml.cs
+@@ -0,0 +1,110 @@
++using Content.Shared.MassDriver;
++using Robust.Client.AutoGenerated;
++using Robust.Client.UserInterface.CustomControls;
++using Robust.Client.UserInterface.XAML;
++using Robust.Shared.Utility;
++
++namespace Content.Client.MassDriver.UI;
++
++[GenerateTypedNameReferences]
++public sealed partial class MassDriverConsoleMenu : DefaultWindow
++{
++    public event Action? OnLaunchButtonPressed;
++    public event Action<MassDriverMode>? OnModeButtonPressed;
++    public event Action<float>? OnThrowSpeed;
++    public event Action<float>? OnThrowDistance;
++
++    public MassDriverConsoleMenu()
++    {
++        RobustXamlLoader.Load(this);
++
++        LaunchButton.OnPressed += _ => OnLaunchButtonPressed?.Invoke();
++
++        AutoModeButton.OnPressed += _ =>
++        {
++            AutoModeButton.Disabled = true;
++            ManualModeButton.Disabled = false;
++            LaunchButton.Disabled = true;
++            OnModeButtonPressed?.Invoke(MassDriverMode.Auto);
++        };
++
++        ManualModeButton.OnPressed += _ =>
++        {
++            AutoModeButton.Disabled = false;
++            ManualModeButton.Disabled = true;
++            LaunchButton.Disabled = false;
++            OnModeButtonPressed?.Invoke(MassDriverMode.Manual);
++        };
++
++        ThrowDistanceSlider.OnValueChanged += _ =>
++        {
++            var throwDistance = Normalize(ThrowDistanceSlider.Value);
++            OnThrowDistance?.Invoke(throwDistance);
++            ThrowDistanceCurrentValue.Text = throwDistance.ToString();
++        };
++
++        ThrowSpeedSlider.OnValueChanged += _ =>
++        {
++            var throwSpeed = Normalize(ThrowSpeedSlider.Value);
++            OnThrowSpeed?.Invoke(throwSpeed);
++            ThrowSpeedCurrentValue.Text = throwSpeed.ToString() + " m/s";
++        };
++    }
++
++    public void UpdateState(MassDriverUiState state)
++    {
++        if (state.MassDriverLinked)
++        {
++            DisabledPanel.Visible = false;
++            DisabledPanel.MouseFilter = MouseFilterMode.Ignore;
++        }
++        else
++        {
++            DisabledPanel.Visible = true;
++            DisabledPanel.MouseFilter = MouseFilterMode.Stop;
++            if (DisabledLabel.GetMessage() is null)
++            {
++                var text = new FormattedMessage();
++                text.AddMarkupOrThrow(Loc.GetString("mass-driver-ui-link"));
++                DisabledLabel.SetMessage(text);
++            }
++        }
++
++        if (state.CurrentMassDriverMode == MassDriverMode.Auto)
++        {
++            AutoModeButton.Disabled = true;
++            ManualModeButton.Disabled = false;
++            LaunchButton.Disabled = true;
++        }
++        else
++        {
++            ManualModeButton.Disabled = true;
++            AutoModeButton.Disabled = false;
++            LaunchButton.Disabled = false;
++        }
++
++        // Sliders Current Value Label
++        ThrowDistanceCurrentValue.Text = state.CurrentThrowDistance.ToString();
++        ThrowSpeedCurrentValue.Text = state.CurrentThrowSpeed.ToString() + " m/s";
++
++        // Distance Slider Labels
++        ThrowDistanceMaxValue.Text = state.MaxThrowDistance.ToString();
++        ThrowDistanceMinValue.Text = state.MinThrowDistance.ToString();
++
++        /// Speed Slider Labels
++        ThrowSpeedMaxValue.Text = state.MaxThrowSpeed.ToString();
++        ThrowSpeedMinValue.Text = state.MinThrowSpeed.ToString();
++
++        // Distance Slider
++        ThrowDistanceSlider.MaxValue = state.MaxThrowDistance;
++        ThrowDistanceSlider.MinValue = state.MinThrowDistance;
++        ThrowDistanceSlider.Value = state.CurrentThrowDistance;
++
++        // Speed Slider
++        ThrowSpeedSlider.MaxValue = state.MaxThrowSpeed;
++        ThrowSpeedSlider.MinValue = state.MinThrowSpeed;
++        ThrowSpeedSlider.Value = state.CurrentThrowSpeed;
++    }
++
++    private float Normalize(float value, int decimals = 1) => (float)Math.Round(value, decimals, MidpointRounding.AwayFromZero);
++}
+diff --git a/Content.Server/MassDriver/EntitySystems/MassDriverSecurityWireAction.cs b/Content.Server/MassDriver/EntitySystems/MassDriverSecurityWireAction.cs
+new file mode 100644
+index 0000000000..ef32135a2a
+--- /dev/null
++++ b/Content.Server/MassDriver/EntitySystems/MassDriverSecurityWireAction.cs
+@@ -0,0 +1,57 @@
++using Content.Server.Wires;
++using Content.Shared.MassDriver;
++using Content.Shared.MassDriver.Components;
++using Content.Shared.Wires;
++
++namespace Content.Server.MassDriver.EntitySystems;
++
++public sealed partial class MassDriverSecurityWireAction : ComponentWireAction<MassDriverComponent>
++{
++    public override Color Color { get; set; } = Color.DarkRed;
++    public override string Name { get; set; } = "wire-name-security";
++
++    [DataField("pulseTimeout")]
++    private int _pulseTimeout = 30;
++
++    public override StatusLightState? GetLightState(Wire wire, MassDriverComponent component) => component.Hacked ? StatusLightState.Off : StatusLightState.On;
++    public override object StatusKey => SecurityWireActionKey.Status;
++
++    public override bool Cut(EntityUid user, Wire wire, MassDriverComponent component)
++    {
++        WiresSystem.TryCancelWireAction(wire.Owner, PulseTimeoutKey.Key);
++        component.Hacked = true;
++
++        return true;
++    }
++
++    public override bool Mend(EntityUid user, Wire wire, MassDriverComponent component)
++    {
++        component.Hacked = false;
++
++        return true;
++    }
++
++    public override void Pulse(EntityUid user, Wire wire, MassDriverComponent component)
++    {
++        component.Hacked = true;
++        WiresSystem.StartWireAction(wire.Owner, _pulseTimeout, PulseTimeoutKey.Key, new TimedWireEvent(AwaitPulseCancel, wire));
++    }
++
++    public override void Update(Wire wire)
++    {
++        if (!IsPowered(wire.Owner))
++            WiresSystem.TryCancelWireAction(wire.Owner, PulseTimeoutKey.Key);
++    }
++
++    private void AwaitPulseCancel(Wire wire)
++    {
++        if (!wire.IsCut
++            && EntityManager.TryGetComponent<MassDriverComponent>(wire.Owner, out var driver))
++            driver.Hacked = false;
++    }
++
++    private enum PulseTimeoutKey : byte
++    {
++        Key
++    }
++}
+diff --git a/Content.Server/MassDriver/EntitySystems/MassDriverSystem.cs b/Content.Server/MassDriver/EntitySystems/MassDriverSystem.cs
+new file mode 100644
+index 0000000000..ae8b4811af
+--- /dev/null
++++ b/Content.Server/MassDriver/EntitySystems/MassDriverSystem.cs
+@@ -0,0 +1,336 @@
++using Content.Shared.MassDriver.Components;
++using Content.Shared.MassDriver;
++using Content.Shared.Throwing;
++using Robust.Shared.Timing;
++using System.Linq;
++using Content.Shared.Power;
++using Content.Server.Power.EntitySystems;
++using Content.Shared.DeviceLinking.Events;
++using Content.Server.Power.Components;
++using Content.Shared.Audio;
++using Robust.Shared.Utility;
++
++namespace Content.Server.MassDriver.EntitySystems;
++
++public sealed class MassDriverSystem : EntitySystem
++{
++    [Dependency] private readonly IGameTiming _timing = default!;
++    [Dependency] private readonly ThrowingSystem _throwing = default!;
++    [Dependency] private readonly EntityLookupSystem _lookup = default!;
++    [Dependency] private readonly SharedAppearanceSystem _appearance = default!;
++    [Dependency] private readonly PowerReceiverSystem _powerReceiver = default!;
++    [Dependency] private readonly SharedUserInterfaceSystem _ui = default!;
++    [Dependency] private readonly SharedAmbientSoundSystem _audioSystem = default!;
++
++    public override void Initialize()
++    {
++        base.Initialize();
++
++        SubscribeLocalEvent<MassDriverComponent, PowerChangedEvent>(OnPowerChanged);
++
++        // UI for console -_-
++        SubscribeLocalEvent<MassDriverConsoleComponent, ComponentInit>(OnInit); // Update state on init
++        SubscribeLocalEvent<MassDriverConsoleComponent, MassDriverModeMessage>(OnModeChanged); // Update state on ui open
++        SubscribeLocalEvent<MassDriverConsoleComponent, MassDriverLaunchMessage>(OnLaunch);
++        SubscribeLocalEvent<MassDriverConsoleComponent, MassDriverThrowSpeedMessage>(OnThrowSpeedChanged);
++        SubscribeLocalEvent<MassDriverConsoleComponent, MassDriverThrowDistanceMessage>(OnThrowDistanceChanged);
++
++        // Device Linking
++        SubscribeLocalEvent<MassDriverConsoleComponent, NewLinkEvent>(OnNewLink);
++        SubscribeLocalEvent<MassDriverConsoleComponent, PortDisconnectedEvent>(OnPortDisconnected);
++        SubscribeLocalEvent<MassDriverComponent, SignalReceivedEvent>(OnSignalReceived);
++        SubscribeLocalEvent<MassDriverConsoleComponent, BoundUIOpenedEvent>(OnBoundUiOpened);
++    }
++
++    #region DeviceLinking
++
++    /// <summary>
++    /// Handle new link to add mass driver in mass driver console component
++    /// </summary>
++    /// <param name="uid">Mass Driver Console</param>
++    /// <param name="component">Mass Driver Console Component</param>
++    /// <param name="args">Event arguments</param>
++    private void OnNewLink(EntityUid uid, MassDriverConsoleComponent component, NewLinkEvent args)
++    {
++        if (!TryComp<MassDriverComponent>(args.Sink, out var driver))
++            return;
++
++        component.MassDrivers.Add(GetNetEntity(args.Sink));
++        driver.Console = GetNetEntity(uid);
++
++        Dirty(args.Sink, driver);
++        Dirty(uid, component);
++
++        UpdateUserInterface(uid, args.Sink, driver);
++    }
++
++    /// <summary>
++    /// Handle disconnecting to remove mass driver from mass driver console component
++    /// </summary>
++    /// <param name="uid">Mass Driver Console</param>
++    /// <param name="component">Mass Driver Console Component</param>
++    /// <param name="args">Event arguments</param>
++    private void OnPortDisconnected(EntityUid uid, MassDriverConsoleComponent component, PortDisconnectedEvent args)
++    {
++        var massDriverNetEntity = GetNetEntity(args.Sink);
++        if (args.Port != component.LinkingPort || !component.MassDrivers.Contains(massDriverNetEntity))
++            return;
++
++        var massDriverEntityUid = args.Sink;
++        if (TryComp<MassDriverComponent>(massDriverEntityUid, out var massDriverComponent))
++        {
++            massDriverComponent.Console = null;
++            Dirty(massDriverEntityUid, massDriverComponent);
++        }
++
++        component.MassDrivers.Remove(massDriverNetEntity);
++        Dirty(uid, component);
++    }
++
++    /// <summary>
++    /// Handle signal receive, for launch some objects.
++    /// </summary>
++    /// <param name="uid">Mass Driver</param>
++    /// <param name="component">Mass Driver Component</param>
++    /// <param name="args">Event arguments</param>
++    private void OnSignalReceived(EntityUid uid, MassDriverComponent component, ref SignalReceivedEvent args)
++    {
++        if (args.Port == component.LaunchPort && component.Mode == MassDriverMode.Manual)
++            AddComp<ActiveMassDriverComponent>(uid);
++    }
++
++    #endregion
++
++    #region Logic
++
++    /// <summary>
++    /// Handle power changing to disable or enable mass driver, so it can't work without power
++    /// </summary>
++    /// <param name="uid">Mass Driver</param>
++    /// <param name="component">Mass Driver Component</param>
++    /// <param name="args">Event arguments</param>
++    private void OnPowerChanged(EntityUid uid, MassDriverComponent component, ref PowerChangedEvent args)
++    {
++        if (component.Mode != MassDriverMode.Auto)
++            return;
++
++        var hasComp = HasComp<ActiveMassDriverComponent>(uid);
++        if (hasComp && !args.Powered)
++            RemComp<ActiveMassDriverComponent>(uid);
++        else if (!hasComp && args.Powered)
++            EnsureComp<ActiveMassDriverComponent>(uid);
++    }
++
++    /// <summary>
++    /// Update only active mass drivers, so we have it more optimized than conveyors
++    /// </summary>
++    public override void Update(float frameTime)
++    {
++        base.Update(frameTime);
++
++        var query = EntityQueryEnumerator<ActiveMassDriverComponent, MassDriverComponent, ApcPowerReceiverComponent>();
++        while (query.MoveNext(out var uid, out var activeMassDriver, out var massDriver, out var powered))
++        {
++            if (_timing.CurTime < activeMassDriver.NextUpdateTime)
++                continue;
++
++            if (activeMassDriver.NextUpdateTime == TimeSpan.Zero)
++            {
++                activeMassDriver.NextUpdateTime = _timing.CurTime + activeMassDriver.UpdateDelay;
++                continue;
++            }
++            activeMassDriver.NextUpdateTime = _timing.CurTime + activeMassDriver.UpdateDelay;
++
++            if (!_powerReceiver.IsPowered(uid))
++                continue;
++
++            var entities = new HashSet<EntityUid>();
++            _lookup.GetEntitiesIntersecting(uid, entities);
++            var entitiesCount = entities.Count(a => !Transform(a).Anchored);
++
++            if (entitiesCount == 0)
++            {
++                // Disable mass driver if we throw all entities
++                if (activeMassDriver.NextThrowTime != TimeSpan.Zero)
++                {
++                    if (TryComp<AmbientSoundComponent>(uid, out var ambient))
++                        _audioSystem.SetAmbience(uid, false, ambient);
++                    activeMassDriver.NextThrowTime = TimeSpan.Zero;
++                    _appearance.SetData(uid, MassDriverVisuals.Launching, false);
++                    _powerReceiver.SetLoad(powered, massDriver.MassDriverPowerLoad);
++                }
++                if (massDriver.Mode == MassDriverMode.Manual)
++                    RemComp<ActiveMassDriverComponent>(uid);
++                continue;
++            }
++
++            // If we find first entity, charge mass driver(wait n seconds setuped in ThrowDelay)
++            if (activeMassDriver.NextThrowTime == TimeSpan.Zero)
++            {
++                activeMassDriver.NextThrowTime = _timing.CurTime + massDriver.ThrowDelay;
++                continue;
++            }
++            else if (_timing.CurTime < activeMassDriver.NextThrowTime)
++                continue;
++
++            _powerReceiver.SetLoad(powered, massDriver.LaunchPowerLoad);
++            _appearance.SetData(uid, MassDriverVisuals.Launching, true);
++
++            ThrowEntities(uid, massDriver, entities, entitiesCount);
++
++            if (TryComp<AmbientSoundComponent>(uid, out var ambientSound))
++                _audioSystem.SetAmbience(uid, true, ambientSound);
++        }
++    }
++
++    /// <summary>
++    /// Throws All entities in list.
++    /// </summary>
++    /// <param name="massDriver">Mass Driver</param>
++    /// <param name="massDriverComponent">Mass Driver Component</param>
++    /// <param name="targets">Targets List</param>
++    /// <param name="targetCount">Count of target(added, because we can ignore some targets like anchored, etc.)</param>
++    private void ThrowEntities(EntityUid massDriver, MassDriverComponent massDriverComponent, HashSet<EntityUid> targets, int targetCount)
++    {
++        var xform = Transform(massDriver);
++        var throwing = xform.LocalRotation.ToWorldVec() * (massDriverComponent.CurrentThrowDistance - (massDriverComponent.ThrowCountDelta * (targets.Count - 1)));
++        var direction = xform.Coordinates.Offset(throwing);
++        var speed = massDriverComponent.Hacked ? massDriverComponent.HackedSpeedRewrite : massDriverComponent.CurrentThrowSpeed - (massDriverComponent.ThrowCountDelta * (targetCount - 1));
++
++        foreach (var entity in targets)
++            _throwing.TryThrow(entity, direction, speed);
++    }
++
++    #endregion
++
++    #region UI
++
++    /// <summary>
++    /// Update ui on init
++    /// </summary>
++    private void OnInit(EntityUid uid, MassDriverConsoleComponent component, ComponentInit args)
++    {
++        var massDriverUid = GetEntity(component.MassDrivers.FirstOrDefault()); // We use first mass driver to update UI state
++        if (TryComp<MassDriverComponent>(massDriverUid, out var driver))
++            UpdateUserInterface(uid, massDriverUid, driver);
++        else
++            UpdateUserInterface(uid, null, null);
++    }
++
++    /// <summary>
++    /// Update ui on ui open
++    /// </summary>
++    private void OnBoundUiOpened(EntityUid uid, MassDriverConsoleComponent component, BoundUIOpenedEvent args)
++    {
++        var massDriverUid = GetEntity(component.MassDrivers.FirstOrDefault()); // We use first mass driver to update UI state
++        if (TryComp<MassDriverComponent>(massDriverUid, out var driver))
++            UpdateUserInterface(uid, massDriverUid, driver);
++        else
++            UpdateUserInterface(uid, null, null);
++    }
++
++    /// <summary>
++    /// Handle mode changing
++    /// </summary>
++    private void OnModeChanged(EntityUid uid, MassDriverConsoleComponent component, MassDriverModeMessage args)
++    {
++        foreach (var massDriverNetEntity in component.MassDrivers)
++        {
++            var massDriverUid = GetEntity(massDriverNetEntity);
++
++            if (!TryComp<MassDriverComponent>(massDriverUid, out var massDriverComponent))
++                return;
++
++            massDriverComponent.Mode = args.Mode;
++            Dirty(massDriverUid, massDriverComponent);
++
++            if (massDriverComponent.Mode == MassDriverMode.Auto)
++                EnsureComp<ActiveMassDriverComponent>(massDriverUid);
++            else if (HasComp<ActiveMassDriverComponent>(massDriverUid))
++                RemComp<ActiveMassDriverComponent>(massDriverUid);
++        }
++
++        var firstMassDriver = GetEntity(component.MassDrivers.FirstOrDefault()); // We use first mass driver to update UI state
++        if (TryComp<MassDriverComponent>(firstMassDriver, out var driver))
++            UpdateUserInterface(uid, firstMassDriver, driver);
++    }
++
++    /// <summary>
++    /// Handle launch button, so we can launch entity
++    /// </summary>
++    private void OnLaunch(EntityUid uid, MassDriverConsoleComponent component, MassDriverLaunchMessage args)
++    {
++        foreach (var massDriverNetEntity in component.MassDrivers)
++        {
++            var massDriverUid = GetEntity(massDriverNetEntity);
++            AddComp<ActiveMassDriverComponent>(massDriverUid);
++        }
++    }
++
++    /// <summary>
++    /// Handle throw speed slider
++    /// </summary>
++    private void OnThrowSpeedChanged(EntityUid uid, MassDriverConsoleComponent component, MassDriverThrowSpeedMessage args)
++    {
++        foreach (var massDriverNetEntity in component.MassDrivers)
++        {
++            var massDriverUid = GetEntity(massDriverNetEntity);
++            if (TryComp<MassDriverComponent>(massDriverUid, out var massDriverComponent))
++                massDriverComponent.CurrentThrowSpeed = Math.Clamp(args.Speed, massDriverComponent.MinThrowSpeed, massDriverComponent.MaxThrowSpeed);
++        }
++    }
++
++    /// <summary>
++    /// Handle throw distance slider
++    /// </summary>
++    private void OnThrowDistanceChanged(EntityUid uid, MassDriverConsoleComponent component, MassDriverThrowDistanceMessage args)
++    {
++        foreach (var massDriverNetEntity in component.MassDrivers)
++        {
++            var massDriverUid = GetEntity(massDriverNetEntity);
++            if (TryComp<MassDriverComponent>(massDriverUid, out var massDriverComponent))
++                massDriverComponent.CurrentThrowDistance = Math.Clamp(args.Distance, massDriverComponent.MinThrowDistance, massDriverComponent.MaxThrowDistance);
++        }
++    }
++
++    /// <summary>
++    /// Updates Mass Driver Console UI
++    /// </summary>
++    /// <param name="console">Mass Driver Console</param>
++    /// <param name="massDriver">Mass Driver</param>
++    /// <param name="component">Mass Driver Component</param>
++    private void UpdateUserInterface(EntityUid console, EntityUid? massDriver, MassDriverComponent? component = null)
++    {
++        if (!_ui.HasUi(console, MassDriverConsoleUiKey.Key))
++            return;
++
++        MassDriverUiState state;
++
++        if (massDriver != null && Resolve(massDriver.Value, ref component))
++        {
++            state = new MassDriverUiState
++            {
++                MaxThrowSpeed = component.MaxThrowSpeed,
++                MaxThrowDistance = component.MaxThrowDistance,
++                MinThrowSpeed = component.MinThrowSpeed,
++                MinThrowDistance = component.MinThrowDistance,
++                CurrentThrowSpeed = component.CurrentThrowSpeed,
++                CurrentThrowDistance = component.CurrentThrowDistance,
++                CurrentMassDriverMode = component.Mode,
++                MassDriverLinked = true
++
++            };
++        }
++        else
++        {
++            state = new MassDriverUiState
++            {
++                MassDriverLinked = false
++            };
++        }
++
++        _ui.SetUiState(console, MassDriverConsoleUiKey.Key, state);
++    }
++
++    #endregion
++}
+diff --git a/Content.Shared/DeviceLinking/Events/PortDisconnectedEvent.cs b/Content.Shared/DeviceLinking/Events/PortDisconnectedEvent.cs
+index 680b0c8453..db6bd0b773 100644
+--- a/Content.Shared/DeviceLinking/Events/PortDisconnectedEvent.cs
++++ b/Content.Shared/DeviceLinking/Events/PortDisconnectedEvent.cs
+@@ -4,9 +4,15 @@ public sealed class PortDisconnectedEvent : EntityEventArgs
+     {
+         public readonly string Port;
+ 
+-        public PortDisconnectedEvent(string port)
++        public readonly EntityUid Source;
++
++        public readonly EntityUid Sink;
++
++        public PortDisconnectedEvent(string port, EntityUid source, EntityUid sink)
+         {
+             Port = port;
++            Source = source;
++            Sink = sink;
+         }
+     }
+ }
+diff --git a/Content.Shared/DeviceLinking/SharedDeviceLinkSystem.cs b/Content.Shared/DeviceLinking/SharedDeviceLinkSystem.cs
+index 5d51bbc3e8..d216dfc94c 100644
+--- a/Content.Shared/DeviceLinking/SharedDeviceLinkSystem.cs
++++ b/Content.Shared/DeviceLinking/SharedDeviceLinkSystem.cs
+@@ -37,7 +37,7 @@ private void OnSourceStartup(Entity<DeviceLinkSourceComponent> source, ref Compo
+     {
+         List<EntityUid> invalidSinks = new();
+         List<(string, string)> invalidLinks = new();
+-        foreach (var (sink, links)  in source.Comp.LinkedPorts)
++        foreach (var (sink, links) in source.Comp.LinkedPorts)
+         {
+             if (!TryComp(sink, out DeviceLinkSinkComponent? sinkComponent))
+             {
+@@ -378,8 +378,8 @@ private void RemoveSinkFromSourceInternal(
+         {
+             foreach (var (sourcePort, sinkPort) in ports)
+             {
+-                RaiseLocalEvent(sourceUid, new PortDisconnectedEvent(sourcePort));
+-                RaiseLocalEvent(sinkUid, new PortDisconnectedEvent(sinkPort));
++                RaiseLocalEvent(sourceUid, new PortDisconnectedEvent(sourcePort, sourceUid, sinkUid));
++                RaiseLocalEvent(sinkUid, new PortDisconnectedEvent(sinkPort, sourceUid, sinkUid));
+             }
+         }
+ 
+@@ -417,8 +417,8 @@ public bool ToggleLink(
+             else
+                 _adminLogger.Add(LogType.DeviceLinking, LogImpact.Low, $"unlinked {ToPrettyString(sourceUid):source} {source} and {ToPrettyString(sinkUid):sink} {sink}");
+ 
+-            RaiseLocalEvent(sourceUid, new PortDisconnectedEvent(source));
+-            RaiseLocalEvent(sinkUid, new PortDisconnectedEvent(sink));
++            RaiseLocalEvent(sourceUid, new PortDisconnectedEvent(source, sourceUid, sinkUid));
++            RaiseLocalEvent(sinkUid, new PortDisconnectedEvent(sink, sourceUid, sinkUid));
+ 
+             outputs.Remove(sinkUid);
+             linkedPorts.Remove((source, sink));
+diff --git a/Content.Shared/MassDriver/Components/ActiveMassDriverComponent.cs b/Content.Shared/MassDriver/Components/ActiveMassDriverComponent.cs
+new file mode 100644
+index 0000000000..a719b9ed65
+--- /dev/null
++++ b/Content.Shared/MassDriver/Components/ActiveMassDriverComponent.cs
+@@ -0,0 +1,22 @@
++using Robust.Shared.GameStates;
++using Robust.Shared.Serialization.TypeSerializers.Implementations.Custom;
++
++namespace Content.Shared.MassDriver.Components;
++
++/// <summary>
++/// Component that activates the mass driver update
++/// </summary>
++[RegisterComponent, NetworkedComponent]
++[AutoGenerateComponentPause]
++public sealed partial class ActiveMassDriverComponent : Component
++{
++    public TimeSpan UpdateDelay = TimeSpan.FromSeconds(1);
++
++    [DataField(customTypeSerializer: typeof(TimeOffsetSerializer))]
++    [AutoPausedField]
++    public TimeSpan NextUpdateTime;
++
++    [DataField(customTypeSerializer: typeof(TimeOffsetSerializer))]
++    [AutoPausedField]
++    public TimeSpan NextThrowTime;
++}
+diff --git a/Content.Shared/MassDriver/Components/MassDriverComponent.cs b/Content.Shared/MassDriver/Components/MassDriverComponent.cs
+new file mode 100644
+index 0000000000..9aee746288
+--- /dev/null
++++ b/Content.Shared/MassDriver/Components/MassDriverComponent.cs
+@@ -0,0 +1,104 @@
++using Content.Shared.DeviceLinking;
++using Robust.Shared.GameStates;
++using Robust.Shared.Prototypes;
++
++namespace Content.Shared.MassDriver.Components;
++
++/// <summary>
++/// Stores configuration and state data for a mass driver.
++/// </summary>
++[RegisterComponent, NetworkedComponent]
++[AutoGenerateComponentState]
++public sealed partial class MassDriverComponent : Component
++{
++    /// <summary>
++    /// Current Mass Driver Throw Speed
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public float CurrentThrowSpeed = 10.0f;
++
++    /// <summary>
++    /// Max Mass Driver Throw Speed which can be setted by console.
++    /// </summary>
++    [DataField]
++    public float MaxThrowSpeed = 10.0f;
++
++    /// <summary>
++    /// Min Mass Driver Throw Speed which can be setted by console.
++    /// </summary>
++    [DataField]
++    public float MinThrowSpeed = 5.0f;
++
++    /// <summary>
++    /// Current Mass Driver Throw Distance
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public float CurrentThrowDistance = 5.0f;
++
++    /// <summary>
++    /// Max Mass Driver Throw Distance which can be setted by console.
++    /// </summary>
++    [DataField]
++    public float MaxThrowDistance = 15.0f;
++
++    /// <summary>
++    /// Min Mass Driver Throw Distance which can be setted by console.
++    /// </summary>
++    [DataField]
++    public float MinThrowDistance = 2.0f;
++
++    /// <summary>
++    /// Determines how much speed or distance will be subtracted from each additional entity
++    /// Example: ThrowSpeed = 10.0f, EntityCount = 2, RealThrowSpeed = 10.0f - 0.5f = 9.5f
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public float ThrowCountDelta = 0.5f;
++
++    /// <summary>
++    /// How moch time we need to wait for throw?
++    /// </summary>
++    [DataField]
++    public TimeSpan ThrowDelay = TimeSpan.FromSeconds(2);
++
++    /// <summary>
++    /// Determines which mode is used by mass driver
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public MassDriverMode Mode = MassDriverMode.Auto;
++
++    /// <summary>
++    /// Mass driver console entity
++    /// </summary>
++    [AutoNetworkedField]
++    public NetEntity? Console; // Only one console can be linked.
++
++    /// <summary>
++    /// How moch energy we consume when launching?
++    /// </summary>
++    [DataField]
++    public float LaunchPowerLoad = 1000f;
++
++    /// <summary>
++    /// How moch energy we consume when just staying?
++    /// </summary>
++    [DataField]
++    public float MassDriverPowerLoad = 100f;
++
++    /// <summary>
++    /// Determines which port is used for receive signals for launch.
++    /// </summary>
++    [DataField]
++    public ProtoId<SinkPortPrototype> LaunchPort = "Launch";
++
++    /// <summary>
++    /// Determines whether it has been hacked.
++    /// </summary>
++    [AutoNetworkedField]
++    public bool Hacked = false;
++
++    /// <summary>
++    /// Determines how mach speed setted up when hacked.
++    /// </summary>
++    [DataField]
++    public float HackedSpeedRewrite = 20f;
++}
+diff --git a/Content.Shared/MassDriver/Components/MassDriverConsoleComponent.cs b/Content.Shared/MassDriver/Components/MassDriverConsoleComponent.cs
+new file mode 100644
+index 0000000000..8cab59919d
+--- /dev/null
++++ b/Content.Shared/MassDriver/Components/MassDriverConsoleComponent.cs
+@@ -0,0 +1,25 @@
++using Content.Shared.DeviceLinking;
++using Robust.Shared.GameStates;
++using Robust.Shared.Prototypes;
++
++namespace Content.Shared.MassDriver.Components;
++
++/// <summary>
++/// Stores configuration and state data for a mass driver console.
++/// </summary>
++[RegisterComponent, NetworkedComponent]
++[AutoGenerateComponentState]
++public sealed partial class MassDriverConsoleComponent : Component
++{
++    /// <summary>
++    /// Mass Driver Entity
++    /// </summary>
++    [DataField, AutoNetworkedField]
++    public List<NetEntity> MassDrivers = new(); // Many MassDrivers can be linked
++
++    /// <summary>
++    /// The machine linking port
++    /// </summary>
++    [DataField]
++    public ProtoId<SourcePortPrototype> LinkingPort = "MassDriverConsoleSender";
++}
+diff --git a/Content.Shared/MassDriver/SharedMassDriver.cs b/Content.Shared/MassDriver/SharedMassDriver.cs
+new file mode 100644
+index 0000000000..d36c45cfb5
+--- /dev/null
++++ b/Content.Shared/MassDriver/SharedMassDriver.cs
+@@ -0,0 +1,74 @@
++using Robust.Shared.Serialization;
++
++namespace Content.Shared.MassDriver;
++
++[Serializable, NetSerializable]
++public enum MassDriverConsoleUiKey : byte
++{
++    Key
++}
++
++[Serializable, NetSerializable]
++public enum MassDriverMode : byte
++{
++    Auto,
++    Manual
++}
++
++[Serializable, NetSerializable]
++public enum MassDriverVisuals : byte
++{
++    Launching
++}
++
++[Serializable, NetSerializable]
++public sealed class MassDriverUiState : BoundUserInterfaceState
++{
++    public float MaxThrowSpeed = 1f;
++    public float MaxThrowDistance = 1f;
++    public float MinThrowSpeed = 0.0f;
++    public float MinThrowDistance = 0.0f;
++    public float CurrentThrowSpeed = 0.5f;
++    public float CurrentThrowDistance = 0.5f;
++    public MassDriverMode CurrentMassDriverMode = MassDriverMode.Auto;
++
++    public bool MassDriverLinked;
++}
++
++[Serializable, NetSerializable]
++public sealed class MassDriverModeMessage : BoundUserInterfaceMessage
++{
++    public MassDriverMode Mode;
++
++    public MassDriverModeMessage(MassDriverMode mode) => Mode = mode;
++}
++
++[Serializable, NetSerializable]
++public sealed class MassDriverLaunchMessage : BoundUserInterfaceMessage
++{
++}
++
++[Serializable, NetSerializable]
++public sealed class MassDriverThrowSpeedMessage : BoundUserInterfaceMessage
++{
++    public float Speed;
++
++    public MassDriverThrowSpeedMessage(float speed) => Speed = speed;
++}
++
++[Serializable, NetSerializable]
++public sealed class MassDriverThrowDistanceMessage : BoundUserInterfaceMessage
++{
++    public float Distance;
++
++    public MassDriverThrowDistanceMessage(float distance) => Distance = distance;
++}
++
++[Serializable, NetSerializable]
++public enum SecurityWireActionKey : byte
++{
++    Key,
++    Status,
++    Pulsed,
++    PulseCancel
++}
+diff --git a/Resources/Audio/Effects/mass_driver_launching.ogg b/Resources/Audio/Effects/mass_driver_launching.ogg
+new file mode 100644
+index 0000000000000000000000000000000000000000..9285fe463e3d05ee41a78a8b069b8afe31e5c3c8
+GIT binary patch
+literal 29505
+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
+V89cwNUH;!st2tKRP51FJ008+N9T@-s
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Locale/en-US/machine-linking/receiver_ports.ftl b/Resources/Locale/en-US/machine-linking/receiver_ports.ftl
+index 40dc681405..63025e1c43 100644
+--- a/Resources/Locale/en-US/machine-linking/receiver_ports.ftl
++++ b/Resources/Locale/en-US/machine-linking/receiver_ports.ftl
+@@ -86,3 +86,9 @@ signal-port-description-logic-memory-input = Signal to load into the memory cell
+ 
+ signal-port-name-logic-enable = Enable
+ signal-port-description-logic-enable = Only loads the input signal into the memory cell when HIGH.
++
++signal-port-name-mass-driver-console-receiver = Mass Driver
++signal-port-description-mass-driver-console-receiver = Recieves options only from Mass Driver Control Console.
++
++signal-port-name-launch = Launch
++signal-port-description-launch = When signal received, activated launch. Requires manual mode enabled.
+diff --git a/Resources/Locale/en-US/machine-linking/transmitter_ports.ftl b/Resources/Locale/en-US/machine-linking/transmitter_ports.ftl
+index d016a7e206..ea9a2fb2d0 100644
+--- a/Resources/Locale/en-US/machine-linking/transmitter_ports.ftl
++++ b/Resources/Locale/en-US/machine-linking/transmitter_ports.ftl
+@@ -75,3 +75,6 @@ signal-port-description-power-discharging = This port is invoked with HIGH when
+ 
+ signal-port-name-item-detected = Detected
+ signal-port-description-item-detected = This port is invoked whenever the transmitter detects an item.
++
++signal-port-name-mass-driver-console-sender = Mass Driver Console
++signal-port-description-mass-driver-console-sender = Sends options only to Mass Driver.
+diff --git a/Resources/Locale/en-US/ui/mass-driver.ftl b/Resources/Locale/en-US/ui/mass-driver.ftl
+new file mode 100644
+index 0000000000..17caea6701
+--- /dev/null
++++ b/Resources/Locale/en-US/ui/mass-driver.ftl
+@@ -0,0 +1,16 @@
++# UI
++
++mass-driver-ui-title = Mass Driver Control
++mass-driver-ui-link = [color=red][font size=16]You need to link mass driver![/font][/color]
++
++# UI Labels
++
++mass-driver-ui-mass-driver-modes-label = Driver Modes:
++mass-driver-ui-throw-distance-current = Current Distance:
++mass-driver-ui-throw-speed-current = Current Speed:
++
++# UI Buttons
++
++mass-driver-ui-auto-mode = Auto
++mass-driver-ui-manual-mode = Manual
++mass-driver-ui-launch = Launch
+diff --git a/Resources/Locale/en-US/wires/wire-names.ftl b/Resources/Locale/en-US/wires/wire-names.ftl
+index 1c35bdeb8c..c7ec9417fd 100644
+--- a/Resources/Locale/en-US/wires/wire-names.ftl
++++ b/Resources/Locale/en-US/wires/wire-names.ftl
+@@ -73,3 +73,4 @@ wire-name-bomb-bolt = BOLT
+ wire-name-speech = SPKR
+ wire-name-listen = MIC
+ wire-name-log = LOG
++wire-name-security = SECR
+diff --git a/Resources/Prototypes/DeviceLinking/sink_ports.yml b/Resources/Prototypes/DeviceLinking/sink_ports.yml
+index 66e2bee27d..a690978152 100644
+--- a/Resources/Prototypes/DeviceLinking/sink_ports.yml
++++ b/Resources/Prototypes/DeviceLinking/sink_ports.yml
+@@ -127,3 +127,13 @@
+   id: SetParticleSigma
+   name: signal-port-name-set-particle-sigma
+   description: signal-port-description-set-particle-sigma
++
++- type: sinkPort
++  id: MassDriverConsoleReceiver
++  name: signal-port-name-mass-driver-console-receiver
++  description: signal-port-description-mass-driver-console-receiver
++
++- type: sinkPort
++  id: Launch
++  name: signal-port-name-launch
++  description: signal-port-description-launch
+diff --git a/Resources/Prototypes/DeviceLinking/source_ports.yml b/Resources/Prototypes/DeviceLinking/source_ports.yml
+index 302679c4d9..18e207abf4 100644
+--- a/Resources/Prototypes/DeviceLinking/source_ports.yml
++++ b/Resources/Prototypes/DeviceLinking/source_ports.yml
+@@ -168,3 +168,9 @@
+   name: signal-port-name-item-detected
+   description: signal-port-description-item-detected
+   defaultLinks: [ Toggle, Trigger, Timer ]
++
++- type: sourcePort
++  id: MassDriverConsoleSender
++  name: signal-port-name-mass-driver-console-sender
++  description: signal-port-description-mass-driver-console-sender
++  defaultLinks: [ MassDriverConsoleReceiver ]
+diff --git a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
+index eec282acda..2a31c826a6 100644
+--- a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
++++ b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
+@@ -1349,3 +1349,15 @@
+       Steel: 2
+       Manipulator: 2
+       Cable: 1
++
++- type: entity
++  parent: BaseMachineCircuitboard
++  id: MassDriverCircuitboard
++  name: mass driver board
++  components:
++  - type: MachineBoard
++    prototype: MassDriver
++    stackRequirements:
++      Steel: 5
++      Manipulator: 2
++      Cable: 4
+diff --git a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
+index 459030d8a9..bc7ec3f313 100644
+--- a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
++++ b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
+@@ -260,7 +260,7 @@
+     state: cpu_service
+   - type: ComputerBoard
+     prototype: ComputerSurveillanceWirelessCameraMonitor
+-  
++
+ - type: entity
+   parent: BaseComputerCircuitboard
+   id: XenoborgCameraMonitorCircuitboard
+@@ -560,3 +560,16 @@
+       state: cpu_science
+     - type: ComputerBoard
+       prototype: StationAiUploadComputer
++
++- type: entity
++  parent: BaseComputerCircuitboard
++  id: MassDriverComputerCircuitboard
++  name: mass driver computer board
++  description: A computer printed circuit board for an mass driver computer.
++  components:
++    - type: Sprite
++      state: net_wired
++    - type: ComputerBoard
++      prototype: MassDriverComputer
++    - type: StaticPrice
++      price: 200
+diff --git a/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml b/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
+index f6538ba64e..ae45ffe9a0 100644
+--- a/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
++++ b/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
+@@ -1636,3 +1636,48 @@
+     containers:
+       circuit_holder: !type:ContainerSlot
+       board: !type:Container
++
++- type: entity
++  parent: BaseComputerAiAccess
++  id: MassDriverComputer
++  name: mass driver computer
++  description: A computer for control mass driver.
++  components:
++  - type: MassDriverConsole
++  - type: ActivatableUI
++    key: enum.MassDriverConsoleUiKey.Key
++  - type: UserInterface
++    interfaces:
++      enum.MassDriverConsoleUiKey.Key:
++        type: MassDriverConsoleBoundUserInterface
++      enum.WiresUiKey.Key:
++        type: WiresBoundUserInterface
++  - type: Sprite
++    layers:
++    - map: ["computerLayerBody"]
++      state: computer
++    - map: ["computerLayerKeyboard"]
++      state: generic_keyboard
++    - map: ["computerLayerScreen"]
++      state: sensors
++    - map: ["computerLayerKeys"]
++      state: generic_keys
++    - map: [ "enum.WiresVisualLayers.MaintenancePanel" ]
++      state: generic_panel_open
++  - type: Computer
++    board: MassDriverComputerCircuitboard
++  - type: PointLight
++    radius: 1.5
++    energy: 1.6
++    color: "#3c5eb5"
++  - type: DeviceList
++  - type: DeviceNetwork
++    deviceNetId: Wired
++  - type: DeviceLinkSource
++    range: 5
++    ports:
++      - MassDriverConsoleSender
++  - type: ItemSlots
++  - type: ContainerContainer
++    containers:
++      board: !type:Container
+diff --git a/Resources/Prototypes/Entities/Structures/Machines/mass_driver.yml b/Resources/Prototypes/Entities/Structures/Machines/mass_driver.yml
+new file mode 100644
+index 0000000000..618166aa97
+--- /dev/null
++++ b/Resources/Prototypes/Entities/Structures/Machines/mass_driver.yml
+@@ -0,0 +1,98 @@
++- type: entity
++  id: MassDriver
++  name: mass driver
++  description: The finest in spring-loaded piston toy technology, now on a space station near you.
++  placement:
++    mode: SnapgridCenter
++  components:
++  - type: ApcPowerReceiver
++    load: 100
++  - type: ExtensionCableReceiver
++  - type: InteractionOutline
++  - type: Clickable
++  - type: Anchorable
++  - type: Pullable
++  - type: Transform
++    anchored: true
++  - type: Appearance
++  - type: MassDriver
++  - type: ActiveMassDriver
++  - type: Physics
++  - type: Fixtures
++    fixtures:
++      fix1:
++        shape:
++          !type:PhysShapeAabb
++          bounds: "-0.3,-0.16,0.3,0.16"
++        density: 200
++  - type: Sprite
++    sprite: Structures/Machines/mass_driver.rsi
++    noRot: true
++    layers:
++      - state: base
++        map: [ "mainLayer" ]
++      - state: panel_open
++        map: ["enum.WiresVisualLayers.MaintenancePanel"]
++  - type: GenericVisualizer
++    visuals:
++      enum.MassDriverVisuals.Launching:
++        mainLayer:
++          True: { state: launching }
++          False: { state: base }
++  - type: DeviceNetwork
++    deviceNetId: Wireless
++    receiveFrequencyId: BasicDevice
++  - type: DeviceList
++  - type: DeviceLinkSink
++    ports:
++      - MassDriverConsoleReceiver
++      - Launch
++  - type: WiresPanel
++  - type: WiresVisuals
++  - type: Wires
++    layoutId: MassDriver
++  - type: UserInterface
++    interfaces:
++      enum.WiresUiKey.Key:
++        type: WiresBoundUserInterface
++  - type: AmbientSound
++    range: 10
++    enabled: False
++    volume: 0
++    sound:
++      path: /Audio/Effects/mass_driver_launching.ogg
++  - type: Rotatable
++  - type: Destructible
++    thresholds:
++      - trigger:
++          !type:DamageTrigger
++          damage: 600
++        behaviors:
++          - !type:DoActsBehavior
++            acts: [ "Destruction" ]
++      - trigger:
++          !type:DamageTrigger
++          damage: 300
++        behaviors:
++          - !type:DoActsBehavior
++            acts: ["Destruction"]
++          - !type:PlaySoundBehavior
++            sound:
++              collection: MetalGlassBreak
++          - !type:SpawnEntitiesBehavior
++            spawn:
++              SheetSteel1:
++                min: 1
++                max: 2
++  - type: Construction
++    graph: Machine
++    node: machine
++    containers:
++      - machine_board
++      - machine_parts
++  - type: Machine
++    board: MassDriverCircuitboard
++  - type: ContainerContainer
++    containers:
++      machine_board: !type:Container
++      machine_parts: !type:Container
+diff --git a/Resources/Prototypes/Recipes/Lathes/Packs/engineering.yml b/Resources/Prototypes/Recipes/Lathes/Packs/engineering.yml
+index 1f504e3ae4..3bf8868326 100644
+--- a/Resources/Prototypes/Recipes/Lathes/Packs/engineering.yml
++++ b/Resources/Prototypes/Recipes/Lathes/Packs/engineering.yml
+@@ -46,6 +46,8 @@
+   - CellRechargerCircuitboard
+   - WeaponCapacitorRechargerCircuitboard
+   - FreezerElectronics
++  - MassDriverCircuitboard
++  - MassDriverComputerCircuitboard
+ 
+ - type: latheRecipePack
+   id: EngineeringBoardsStatic
+diff --git a/Resources/Prototypes/Recipes/Lathes/computer_boards.yml b/Resources/Prototypes/Recipes/Lathes/computer_boards.yml
+index 2bf3bb3c34..db8ea52c77 100644
+--- a/Resources/Prototypes/Recipes/Lathes/computer_boards.yml
++++ b/Resources/Prototypes/Recipes/Lathes/computer_boards.yml
+@@ -57,6 +57,11 @@
+   id: SolarControlComputerCircuitboard
+   result: SolarControlComputerCircuitboard
+ 
++- type: latheRecipe
++  parent: [ BaseCircuitboardRecipe, BaseEngineeringComputerRecipeCategory ]
++  id: MassDriverComputerCircuitboard
++  result: MassDriverComputerCircuitboard
++
+ # Medical
+ 
+ # Science
+diff --git a/Resources/Prototypes/Recipes/Lathes/machine_boards.yml b/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
+index 23eb3bfbb7..9d593b76dd 100644
+--- a/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
++++ b/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
+@@ -462,3 +462,8 @@
+   parent: [ BaseCircuitboardRecipe, BaseGeneralMachineRecipeCategory ]
+   id: HolopadMachineCircuitboard
+   result: HolopadMachineCircuitboard
++
++- type: latheRecipe
++  parent: [ BaseCircuitboardRecipe, BaseGeneralMachineRecipeCategory ]
++  id: MassDriverCircuitboard
++  result: MassDriverCircuitboard
+diff --git a/Resources/Prototypes/Wires/layouts.yml b/Resources/Prototypes/Wires/layouts.yml
+index 675dd16b1c..6158a0c684 100644
+--- a/Resources/Prototypes/Wires/layouts.yml
++++ b/Resources/Prototypes/Wires/layouts.yml
+@@ -232,3 +232,12 @@
+   wires:
+   - !type:AccessWireAction
+   - !type:AiInteractWireAction
++
++- type: wireLayout
++  id: MassDriver
++  dummyWires: 3
++  wires:
++  - !type:PowerWireAction
++  - !type:PowerWireAction
++    pulseTimeout: 15
++  - !type:MassDriverSecurityWireAction
+diff --git a/Resources/Textures/Structures/Machines/mass_driver.rsi/base.png b/Resources/Textures/Structures/Machines/mass_driver.rsi/base.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e96d9067cd76f9147645183c6144891da994292f
+GIT binary patch
+literal 2081
+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
+F697+{8mRyP
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Structures/Machines/mass_driver.rsi/launching.png b/Resources/Textures/Structures/Machines/mass_driver.rsi/launching.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dea36492bc614e9b97020b0ea3a6e3fff4f1e3d
+GIT binary patch
+literal 6255
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Structures/Machines/mass_driver.rsi/meta.json b/Resources/Textures/Structures/Machines/mass_driver.rsi/meta.json
+new file mode 100644
+index 0000000000..683c15f09c
+--- /dev/null
++++ b/Resources/Textures/Structures/Machines/mass_driver.rsi/meta.json
+@@ -0,0 +1,107 @@
++{
++  "version": 1,
++  "size": {
++    "x": 32,
++    "y": 32
++  },
++  "copyright": "Taked From tgstation",
++  "license": "CC-BY-SA-3.0",
++  "states": [
++    {
++      "name": "base",
++      "directions": 4,
++      "delays": [
++        [
++          1,
++          1,
++          1,
++          1,
++          1
++        ],
++        [
++          1,
++          1,
++          1,
++          1,
++          1
++        ],
++        [
++          1,
++          1,
++          1,
++          1,
++          1
++        ],
++        [
++          1,
++          1,
++          1,
++          1,
++          1
++        ]
++      ]
++    },
++    {
++      "name": "launching",
++      "directions": 4,
++      "delays": [
++        [
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1
++        ],
++        [
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1
++        ],
++        [
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1
++        ],
++        [
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1,
++          0.1
++        ]
++      ]
++    },
++    {
++      "name": "panel_open",
++      "directions": 4
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/Resources/Textures/Structures/Machines/mass_driver.rsi/panel_open.png b/Resources/Textures/Structures/Machines/mass_driver.rsi/panel_open.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..65c8e3b38df38a78c599cb015374ee2d43a83d6a
+GIT binary patch
+literal 607
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z$EGE
+z;uumf=j|=S?As0^>>u{~xbaJR9nF1oO>ZIVV;?n@U@`ut-weDZuh<RZcD1gF<^IdW
+zF1L$?i|wK2u?d${S6^6WRdQj1=`Oxcttv|cBI{fi{lA}<{O;wvbLG31Gk0`!M5QjA
+zQvK)WFSd8*_vfYguX?EFRw?&GWribXg09%=shkWAot+cXG)tEJKhF|#gU5lNO*74m
+zq2(W|?ZmM113X?|o?D*d%X59arHn;p|KHA;yc0wYpEVCxDvYvbT9mJv^tfQlewSHG
+zlL}pgKh#*Re*F3S^c~iL3=OA?cX|fsFg~;>5f)BdIEDN8!)u)$U5b9oALi-5i{G)Y
+zadsU?%w-l6N!NPk9F`xuua&6DKdszw`1G&d8(IsLdzV~jh*he-%Uqx@x=L^(i_BYn
+zMuv@r7IXIr)XvIwDiQr)yfb!d+19Djj2jC*xOkh-e*SYjMk_>lk$+R>w6OB}sfj9*
+zD|+X>f4FqIu@V?85_@s#Tlwm))$e2K=Ow2xA6fS5_1(@U$tfFF&#N#k56=>RE#|ee
+zv-88(yZ!3#-=&!~NKUyh@!p=x@7vbC3$oz5`}F6ph2PdI|6RiMW^d)z*xxQ-aLH<8
+zWaXb#d#%i4Waoco*Z6xZ=WlB4Zu_|&3})5=vYAUFyEZpRA365$@AAX#u^B-;g^8PQ
+zm3Ev{Nmw}L^U-Pl_E_aT?l%1Ak{RA*u(fpQ9yb@4D~9_Sob$H(@49~@l!1YP!PC{x
+JWt~$(697hL6H@>H
+
+literal 0
+HcmV?d00001
+

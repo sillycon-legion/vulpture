@@ -1,0 +1,25 @@
+{
+    "pr_number": 38704,
+    "commit": "43fd96026db7b9fd31dbafbbd04d3a2b6a575b58",
+    "changelog": {
+        "author": "yagwog",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Paper documents now support [form] tags for fillable text fields"
+            },
+            {
+                "type": "Add",
+                "message": "Paper documents now support [signature] tags for player signatures"
+            },
+            {
+                "type": "Add",
+                "message": "Multiple form fields and signatures can be used in a single document"
+            },
+            {
+                "type": "Add",
+                "message": "[check] to create check boxes on paperwork that can be used to tick, cross or leave blank."
+            }
+        ]
+    }
+}

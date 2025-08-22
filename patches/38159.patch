@@ -1,0 +1,3298 @@
+diff --git a/Resources/Locale/en-US/ghost/roles/ghost-role-component.ftl b/Resources/Locale/en-US/ghost/roles/ghost-role-component.ftl
+index ce52b88655..a578adf82b 100644
+--- a/Resources/Locale/en-US/ghost/roles/ghost-role-component.ftl
++++ b/Resources/Locale/en-US/ghost/roles/ghost-role-component.ftl
+@@ -244,9 +244,24 @@ ghost-role-information-syndicate-cyborg-assault-name = Syndicate Assault Cyborg
+ ghost-role-information-syndicate-cyborg-saboteur-name = Syndicate Saboteur Cyborg
+ ghost-role-information-syndicate-cyborg-description = The Syndicate needs reinforcements. You, a cold silicon killing machine, will help them.
+ 
+-ghost-role-information-derelict-cyborg-name = Derelict Cyborg
++ghost-role-information-derelict-engineering-cyborg-name = Derelict Engineer Cyborg
++ghost-role-information-derelict-engineering-cyborg-description = You are an engineer cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
++
++ghost-role-information-derelict-cyborg-name = Derelict Generic Cyborg
+ ghost-role-information-derelict-cyborg-description = You are a regular cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
+ 
++ghost-role-information-derelict-janitor-cyborg-name = Derelict Janitor Cyborg
++ghost-role-information-derelict-janitor-cyborg-description = You are a janitor cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
++
++ghost-role-information-derelict-medical-cyborg-name = Derelict Medical Cyborg
++ghost-role-information-derelict-medical-cyborg-description = You are a medical cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
++
++ghost-role-information-derelict-mining-cyborg-name = Derelict Salvage Cyborg
++ghost-role-information-derelict-mining-cyborg-description = You are a salvage cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
++
++ghost-role-information-derelict-syndicate-assault-cyborg-name = Derelict Syndicate Assault Cyborg
++ghost-role-information-derelict-syndicate-assault-cyborg-description = You are an early model syndicate assault cyborg that got lost in space. After years of exposure to ion storms you find yourself near a space station.
++
+ ghost-role-information-security-name = Security
+ ghost-role-information-security-description = You are part of a security task force, but seem to have found yourself in a strange situation...
+ 
+diff --git a/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml b/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
+index 48a2e70655..11f1de8cb4 100644
+--- a/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
++++ b/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
+@@ -211,6 +211,18 @@
+     - sprite: Mobs/Aliens/paradox_clone.rsi
+       state: preview
+ 
++- type: entity
++  categories: [ HideSpawnMenu, Spawner ]
++  parent: SpawnPointGhostDerelictCyborg
++  id: SpawnPointGhostDerelictEngineeringCyborg
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-engineering-cyborg-name
++    description: ghost-role-information-derelict-engineering-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++
+ - type: entity
+   categories: [ HideSpawnMenu, Spawner ]
+   parent: BaseAntagSpawner
+@@ -229,6 +241,54 @@
+     - sprite: Mobs/Silicon/chassis.rsi
+       state: derelict_icon
+ 
++- type: entity
++  categories: [ HideSpawnMenu, Spawner ]
++  parent: SpawnPointGhostDerelictCyborg
++  id: SpawnPointGhostDerelictJanitorCyborg
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-janitor-cyborg-name
++    description: ghost-role-information-derelict-janitor-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++
++- type: entity
++  categories: [ HideSpawnMenu, Spawner ]
++  parent: SpawnPointGhostDerelictCyborg
++  id: SpawnPointGhostDerelictMedicalCyborg
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-medical-cyborg-name
++    description: ghost-role-information-derelict-medical-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++
++- type: entity
++  categories: [ HideSpawnMenu, Spawner ]
++  parent: SpawnPointGhostDerelictCyborg
++  id: SpawnPointGhostDerelictMiningCyborg
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-mining-cyborg-name
++    description: ghost-role-information-derelict-mining-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++
++- type: entity
++  categories: [ HideSpawnMenu, Spawner ]
++  parent: SpawnPointGhostDerelictCyborg
++  id: SpawnPointGhostDerelictSyndicateAssaultCyborg
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-syndicate-assault-cyborg-name
++    description: ghost-role-information-derelict-syndicate-assault-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++
+ - type: entity
+   categories: [ HideSpawnMenu, Spawner ]
+   parent: BaseAntagSpawner
+diff --git a/Resources/Prototypes/Entities/Mobs/Cyborgs/base_borg_chassis.yml b/Resources/Prototypes/Entities/Mobs/Cyborgs/base_borg_chassis.yml
+index 34fdbbd74b..4b170af6be 100644
+--- a/Resources/Prototypes/Entities/Mobs/Cyborgs/base_borg_chassis.yml
++++ b/Resources/Prototypes/Entities/Mobs/Cyborgs/base_borg_chassis.yml
+@@ -353,6 +353,7 @@
+     - Syndicate
+   - type: ActiveRadio
+     channels:
++    - Binary
+     - Syndicate
+   - type: ShowSyndicateIcons
+   - type: MovementAlwaysTouching
+@@ -386,6 +387,19 @@
+     chance: 1
+   - type: ShowJobIcons
+ 
++- type: entity
++  id: BaseBorgChassisSyndicateDerelict #For assault borg and maybe others in time
++  parent: BaseBorgChassisSyndicate
++  abstract: true
++  components:
++  - type: SiliconLawProvider
++    laws: SyndicateStatic #Non-subverted version so they can still be changed
++  - type: StartIonStormed
++    ionStormAmount: 3
++  - type: IonStormTarget
++    chance: 1
++  - type: ShowJobIcons
++
+ - type: entity
+   parent: BaseBorgChassisNotIonStormable
+   id: BaseXenoborgChassis
+diff --git a/Resources/Prototypes/Entities/Mobs/Cyborgs/borg_chassis.yml b/Resources/Prototypes/Entities/Mobs/Cyborgs/borg_chassis.yml
+index 87b8d54a97..1b9fbed3ac 100644
+--- a/Resources/Prototypes/Entities/Mobs/Cyborgs/borg_chassis.yml
++++ b/Resources/Prototypes/Entities/Mobs/Cyborgs/borg_chassis.yml
+@@ -206,7 +206,7 @@
+       map: ["light"]
+       visible: false
+   - type: BorgChassis
+-    maxModules: 5 # the sixth one broke lol
++    maxModules: 5 # One less module slot than the regular module to reflect this being a "broken" cyborg.
+     moduleWhitelist:
+       tags:
+       - BorgModuleGeneric
+@@ -218,4 +218,165 @@
+     interactSuccessString: petting-success-derelict-cyborg
+     interactFailureString: petting-failure-derelict-cyborg
+     interactSuccessSound:
+-      path: /Audio/Ambience/Objects/periodic_beep.ogg
+\ No newline at end of file
++      path: /Audio/Ambience/Objects/periodic_beep.ogg
++
++- type: entity
++  parent: BaseBorgChassisDerelict
++  id: EngineeringBorgChassisDerelict
++  name: derelict engineer cyborg
++  description: A man-machine hybrid that assists the engineering department. This one seems to have chunks of strange crystals pockmarking its surface.
++  components:
++  - type: Sprite
++    layers:
++    - state: engineer_derelict
++    - state: engineer_e_r
++      map: ["enum.BorgVisualLayers.Light"]
++      shader: unshaded
++      visible: false
++    - state: engineer_derelict_crystal #This layer and the layer below are duplicated in order to create a more mellow unshaded layer. See https://github.com/space-wizards/space-station-14/pull/37869 for more info on the method.
++      shader: unshaded
++    - state: engineer_derelict_crystal
++      shader: shaded
++    - state: engineer_l
++      shader: unshaded
++      map: ["light"]
++      visible: false
++  - type: BorgChassis
++    maxModules: 5 # One less module slot than the regular module to reflect this being a "broken" cyborg.
++    moduleWhitelist:
++      tags:
++      - BorgModuleGeneric
++      - BorgModuleEngineering
++    hasMindState: engineer_e
++    noMindState: engineer_e_r
++
++- type: entity
++  parent: BaseBorgChassisDerelict
++  id: JanitorBorgChassisDerelict
++  name: derelict janitor cyborg
++  description: A man-machine hybrid that assists the service department. It's a bigger mess than anything it can clean up.
++  components:
++  - type: Sprite
++    layers:
++    - state: janitor_derelict
++      map: ["movement"]
++    - state: janitor_e_r
++      map: ["enum.BorgVisualLayers.Light"]
++      shader: unshaded
++      visible: false
++    - state: janitor_l
++      shader: unshaded
++      map: ["light"]
++      visible: false
++  - type: SpriteMovement
++    movementLayers:
++      movement:
++        state: janitor_moving_derelict
++    noMovementLayers:
++      movement:
++        state: janitor_derelict
++  - type: BorgChassis
++    maxModules: 5 # One less module slot than the regular module to reflect this being a "broken" cyborg.
++    moduleWhitelist:
++      tags:
++      - BorgModuleGeneric
++      - BorgModuleJanitor
++    hasMindState: janitor_e
++    noMindState: janitor_e_r
++
++- type: entity
++  parent: BaseBorgChassisDerelict
++  id: MedicalBorgChassisDerelict
++  name: derelict medical cyborg
++  description: A man-machine hybrid that assists the medical department. This one's needles don't look very sanitary.
++  components:
++  - type: Sprite
++    layers:
++    - state: medical_derelict
++      map: ["movement"]
++    - state: medical_e_r
++      map: ["enum.BorgVisualLayers.Light"]
++      shader: unshaded
++      visible: false
++    - state: medical_l
++      shader: unshaded
++      map: ["light"]
++      visible: false
++  - type: SpriteMovement
++    movementLayers:
++      movement:
++        state: medical_moving_derelict
++    noMovementLayers:
++      movement:
++        state: medical_derelict
++  - type: BorgChassis
++    maxModules: 6 # One less module slot than the regular module to reflect this being a "broken" cyborg.
++    moduleWhitelist:
++      tags:
++      - BorgModuleGeneric
++      - BorgModuleMedical
++    hasMindState: medical_e
++    noMindState: medical_e_r
++
++- type: entity
++  parent: BaseBorgChassisDerelict
++  id: MiningBorgChassisDerelict
++  name: derelict salvage cyborg
++  description: A man-machine hybrid that assists the cargo department. This one has seen the wrong side of a gibtonite chunk.
++  components:
++  - type: Sprite
++    layers:
++    - state: miner_derelict
++      map: ["movement"]
++    - state: miner_e_r
++      map: ["enum.BorgVisualLayers.Light"]
++      shader: unshaded
++      visible: false
++    - state: miner_l
++      shader: unshaded
++      map: ["light"]
++      visible: false
++  - type: SpriteMovement
++    movementLayers:
++      movement:
++        state: miner_moving_derelict
++    noMovementLayers:
++      movement:
++        state: miner_derelict
++  - type: BorgChassis
++    maxModules: 6 # One less module slot than the regular module to reflect this being a "broken" cyborg.
++    moduleWhitelist:
++      tags:
++      - BorgModuleGeneric
++      - BorgModuleCargo
++    hasMindState: miner_e
++    noMindState: miner_e_r
++
++- type: entity
++  parent: BaseBorgChassisSyndicateDerelict
++  id: SyndicateAssaultBorgChassisDerelict
++  name: derelict syndicate assault cyborg
++  description: A lean, mean killing machine with access to a variety of deadly modules. This one is more rust-orange than blood-red.
++  components:
++  - type: Sprite
++    layers:
++    - state: synd_sec_derelict
++    - state: synd_sec_e
++      map: ["enum.BorgVisualLayers.Light"]
++      shader: unshaded
++      visible: false
++    - state: synd_sec_l
++      shader: unshaded
++      map: ["light"]
++      visible: false
++  - type: BorgChassis
++    maxModules: 3
++    moduleWhitelist: # Note - the Derelict Assault Borg does not have a traversal module. This is intentional as Assault Borgs have space traversal with their c20 and free space movement, and they can navigate to the station using the pinpointer.
++      tags:
++      - BorgModuleGeneric
++      - BorgModuleSyndicate
++      - BorgModuleSyndicateAssault
++    hasMindState: synd_sec_derelict_e
++    noMindState: synd_sec_derelict
++  - type: Construction
++    node: derelictcyborg
+diff --git a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
+index 303f7dc676..c2025bb663 100644
+--- a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
++++ b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
+@@ -383,7 +383,7 @@
+       borg_module:
+         - BorgModuleOperative
+         - BorgModuleL6C
+-        - BorgModuleEsword
++        - BorgModuleDoubleEsword
+   - type: ItemSlots
+     slots:
+       cell_slot:
+@@ -453,8 +453,44 @@
+     - PlayerBorgSyndicateSaboteurGhostRole
+ 
+ - type: entity
+-  id: PlayerBorgDerelict
++  parent: EngineeringBorgChassisDerelict
++  id: PlayerEngineeringBorgDerelict
++  suffix: Battery, Module
++  components:
++  - type: ContainerFill
++    containers:
++      borg_brain:
++      - PositronicBrain
++      borg_module:
++      - BorgModuleTool
++      - BorgModuleFireExtinguisher
++      - BorgModuleConstruction
++      - BorgModuleRCD
++      - BorgModuleCable
++  - type: ItemSlots
++    slots:
++      cell_slot:
++        name: power-cell-slot-component-slot-name-default
++        startingItem: PowerCellHigh
++  - type: RandomMetadata
++    nameSegments: [NamesBorg]
++
++- type: entity
++  parent: PlayerEngineeringBorgDerelict
++  id: PlayerEngineeringBorgDerelictGhostRole
++  suffix: Ghost role
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-engineering-cyborg-name
++    description: ghost-role-information-derelict-engineering-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++  - type: GhostTakeoverAvailable
++
++- type: entity
+   parent: BorgChassisDerelict
++  id: PlayerBorgDerelict
+   suffix: Battery, Module
+   components:
+   - type: ContainerFill
+@@ -473,8 +509,8 @@
+     nameSegments: [NamesBorg]
+ 
+ - type: entity
+-  id: PlayerBorgDerelictGhostRole
+   parent: PlayerBorgDerelict
++  id: PlayerBorgDerelictGhostRole
+   suffix: Ghost role
+   components:
+     - type: GhostRole
+@@ -484,3 +520,143 @@
+       raffle:
+         settings: default
+     - type: GhostTakeoverAvailable
++
++- type: entity
++  parent: JanitorBorgChassisDerelict
++  id: PlayerJanitorBorgDerelict
++  suffix: Battery, Module
++  components:
++  - type: ContainerFill
++    containers:
++      borg_brain:
++      - PositronicBrain
++      borg_module:
++      - BorgModuleTool
++      - BorgModuleFireExtinguisher
++      - BorgModuleCleaning
++      - BorgModuleCustodial
++  - type: ItemSlots
++    slots:
++      cell_slot:
++        name: power-cell-slot-component-slot-name-default
++        startingItem: PowerCellHigh
++  - type: RandomMetadata
++    nameSegments: [NamesBorg]
++
++- type: entity
++  parent: PlayerJanitorBorgDerelict
++  id: PlayerJanitorBorgDerelictGhostRole
++  suffix: Ghost role
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-janitor-cyborg-name
++    description: ghost-role-information-derelict-janitor-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++  - type: GhostTakeoverAvailable
++
++- type: entity
++  parent: MedicalBorgChassisDerelict
++  id: PlayerMedicalBorgDerelict
++  suffix: Battery, Module
++  components:
++  - type: ContainerFill
++    containers:
++      borg_brain:
++      - PositronicBrain
++      borg_module:
++      - BorgModuleTool
++      - BorgModuleFireExtinguisher
++      - BorgModuleChemical
++      - BorgModuleTopicals
++      - BorgModuleRescue
++  - type: ItemSlots
++    slots:
++      cell_slot:
++        name: power-cell-slot-component-slot-name-default
++        startingItem: PowerCellHigh
++  - type: RandomMetadata
++    nameSegments: [NamesBorg]
++
++- type: entity
++  parent: PlayerMedicalBorgDerelict
++  id: PlayerMedicalBorgDerelictGhostRole
++  suffix: Ghost role
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-medical-cyborg-name
++    description: ghost-role-information-derelict-medical-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++  - type: GhostTakeoverAvailable
++
++- type: entity
++  parent: MiningBorgChassisDerelict
++  id: PlayerMiningBorgDerelict
++  suffix: Battery, Module
++  components:
++  - type: ContainerFill
++    containers:
++      borg_brain:
++      - PositronicBrain
++      borg_module:
++      - BorgModuleTool #No fire extinguisher, traversal is better
++      - BorgModuleMining
++      - BorgModuleTraversal
++      - BorgModuleAppraisal
++  - type: ItemSlots
++    slots:
++      cell_slot:
++        name: power-cell-slot-component-slot-name-default
++        startingItem: PowerCellHigh
++  - type: RandomMetadata
++    nameSegments: [NamesBorg]
++
++- type: entity
++  parent: PlayerMiningBorgDerelict
++  id: PlayerMiningBorgDerelictGhostRole
++  suffix: Ghost role
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-mining-cyborg-name
++    description: ghost-role-information-derelict-mining-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++  - type: GhostTakeoverAvailable
++
++- type: entity
++  parent: SyndicateAssaultBorgChassisDerelict
++  id: PlayerSyndicateAssaultBorgDerelict
++  suffix: Battery, Module
++  components:
++  - type: ContainerFill
++    containers:
++      borg_brain:
++      - PositronicBrain
++      borg_module:
++      - BorgModuleOperative
++      - BorgModuleC20r
++      - BorgModuleEsword
++  - type: ItemSlots
++    slots:
++      cell_slot:
++        name: power-cell-slot-component-slot-name-default
++        startingItem: PowerCellHyper
++  - type: RandomMetadata
++    nameSegments: [NamesDeathCommando]
++
++- type: entity
++  parent: PlayerSyndicateAssaultBorgDerelict
++  id: PlayerBorgSyndicateDerelictGhostRole
++  suffix: Ghost role
++  components:
++  - type: GhostRole
++    name: ghost-role-information-derelict-syndicate-assault-cyborg-name
++    description: ghost-role-information-derelict-syndicate-assault-cyborg-description
++    rules: ghost-role-information-silicon-rules
++    raffle:
++      settings: default
++  - type: GhostTakeoverAvailable
+diff --git a/Resources/Prototypes/Entities/Objects/Specific/Robotics/borg_modules.yml b/Resources/Prototypes/Entities/Objects/Specific/Robotics/borg_modules.yml
+index 02b1afdbc5..2a971d71ea 100644
+--- a/Resources/Prototypes/Entities/Objects/Specific/Robotics/borg_modules.yml
++++ b/Resources/Prototypes/Entities/Objects/Specific/Robotics/borg_modules.yml
+@@ -1132,8 +1132,8 @@
+ 
+ #syndicate modules
+ - type: entity
+-  id: BorgModuleSyndicateWeapon
+   parent: [ BaseBorgModule, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleSyndicateWeapon
+   name: weapon cyborg module
+   components:
+   - type: Sprite
+@@ -1168,8 +1168,8 @@
+     price: 2500
+ 
+ - type: entity
+-  id: BorgModuleOperative
+   parent: [ BaseBorgModuleSyndicate, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleOperative
+   name: operative cyborg module
+   description: A module that comes with a crowbar, an Emag, an Access Breaker and a syndicate pinpointer.
+   components:
+@@ -1187,42 +1187,76 @@
+       icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-operative-module }
+ 
+ - type: entity
+-  id: BorgModuleEsword
+   parent: [ BaseBorgModuleSyndicate, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleEsword
+   name: energy sword cyborg module
+-  description: A module that comes with a double energy sword.
++  description: A weapons module that comes with an energy sword.
+   components:
+-    - type: Sprite
+-      layers:
+-      - state: syndicate
+-      - state: icon-syndicate
+-    - type: ItemBorgModule
+-      hands:
+-      - item: CyborgEnergySwordDouble
+-      - item: PinpointerSyndicateNuclear
+-    - type: BorgModuleIcon
+-      icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-esword-module }
++  - type: Sprite
++    layers:
++    - state: syndicate
++    - state: icon-syndicate
++  - type: ItemBorgModule
++    hands:
++    - item: CyborgEnergySword
++    - item: PinpointerSyndicateNuclear
++  - type: BorgModuleIcon
++    icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-esword-module }
++
++- type: entity
++  id: BorgModuleDoubleEsword
++  parent: [ BaseBorgModuleSyndicate, BaseProviderBorgModule, BaseSyndicateContraband ]
++  name: double energy sword cyborg module
++  description: A weapons module that comes with a double energy sword.
++  components:
++  - type: Sprite
++    layers:
++    - state: syndicate
++    - state: icon-syndicate
++  - type: ItemBorgModule
++    hands:
++    - item: CyborgEnergySwordDouble
++    - item: PinpointerSyndicateNuclear
++  - type: BorgModuleIcon
++    icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-desword-module }
+ 
+ - type: entity
+-  id: BorgModuleL6C
+   parent: [ BaseBorgModuleSyndicateAssault, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleL6C
+   name: L6C ROW cyborg module
+-  description: A module that comes with a L6C.
++  description: A weapons module that comes with a L6C.
+   components:
+-    - type: Sprite
+-      layers:
+-      - state: syndicate
+-      - state: icon-syndicate
+-    - type: ItemBorgModule
+-      hands:
+-      - item: WeaponLightMachineGunL6C
+-      - item: PinpointerSyndicateNuclear
+-    - type: BorgModuleIcon
+-      icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-l6c-module }
++  - type: Sprite
++    layers:
++    - state: syndicate
++    - state: icon-syndicate
++  - type: ItemBorgModule
++    hands:
++    - item: WeaponLightMachineGunL6C
++    - item: PinpointerSyndicateNuclear
++  - type: BorgModuleIcon
++    icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-l6c-module }
++
++- type: entity
++  parent: [ BaseBorgModuleSyndicateAssault, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleC20r
++  name: C20-r ROW cyborg module
++  description: A weapons module that comes with a burst-fire C-20r.
++  components:
++  - type: Sprite
++    layers:
++    - state: syndicate
++    - state: icon-syndicate
++  - type: ItemBorgModule
++    hands:
++    - item: WeaponSubMachineGunC20rROW
++    - item: PinpointerSyndicateNuclear
++  - type: BorgModuleIcon
++    icon: { sprite: Interface/Actions/actions_borg.rsi, state: syndicate-c20r-module }
+ 
+ - type: entity
+-  id: BorgModuleMartyr
+   parent: [ BaseBorgModule, BaseProviderBorgModule, BaseSyndicateContraband ]
++  id: BorgModuleMartyr
+   name: martyr cyborg module
+   description: "A module that comes with an explosive you probably don't want to handle yourself."
+   components:
+diff --git a/Resources/Prototypes/Entities/Objects/Weapons/Guns/SMGs/smgs.yml b/Resources/Prototypes/Entities/Objects/Weapons/Guns/SMGs/smgs.yml
+index f069b4a918..2ecaaec89e 100644
+--- a/Resources/Prototypes/Entities/Objects/Weapons/Guns/SMGs/smgs.yml
++++ b/Resources/Prototypes/Entities/Objects/Weapons/Guns/SMGs/smgs.yml
+@@ -123,6 +123,47 @@
+   - type: StaticPrice
+     price: 5000
+ 
++- type: entity
++  name: C-20r ROW #I think ROW stands for Recharging Onboard Weapon so i'm following the L6C's example
++  id: WeaponSubMachineGunC20rROW
++  parent: BaseItem
++  description: A burst-fire C-20r submachine gun for use by cyborgs. Creates .35 caliber ammo on the fly from an internal ammo fabricator, which slowly self-charges.
++  components:
++  - type: Gun
++    minAngle: 2
++    maxAngle: 16
++    angleIncrease: 4
++    angleDecay: 16
++    fireRate: 8
++    burstFireRate: 8
++    selectedMode: Burst
++    availableModes:
++    - Burst
++    soundGunshot:
++      path: /Audio/Weapons/Guns/Gunshots/c-20r.ogg
++  - type: Sprite
++    sprite: Objects/Weapons/Guns/SMGs/c20r.rsi
++    layers:
++    - state: base
++      map: ["enum.GunVisualLayers.Base"]
++    - state: mag-5
++      map: ["enum.GunVisualLayers.Mag"]
++  - type: Item
++    size: Huge
++  - type: ContainerContainer
++    containers:
++      ballistic-ammo: !type:Container
++  - type: ProjectileBatteryAmmoProvider
++    proto: CartridgePistol
++    fireCost: 100
++  - type: Battery
++    maxCharge: 3000
++    startingCharge: 3000
++  - type: BatterySelfRecharger
++    autoRecharge: true
++    autoRechargeRate: 25
++  - type: AmmoCounter
++
+ - type: entity
+   name: Drozd
+   parent: [BaseWeaponSubMachineGun, BaseSecurityContraband]
+diff --git a/Resources/Prototypes/Entities/Objects/Weapons/Melee/e_sword.yml b/Resources/Prototypes/Entities/Objects/Weapons/Melee/e_sword.yml
+index f634425006..5f431416e7 100644
+--- a/Resources/Prototypes/Entities/Objects/Weapons/Melee/e_sword.yml
++++ b/Resources/Prototypes/Entities/Objects/Weapons/Melee/e_sword.yml
+@@ -397,10 +397,17 @@
+     spread: 75
+ 
+ # Borgs
++
++- type: entity
++  parent: EnergySword
++  id: CyborgEnergySword
++  suffix: For Borgs
++  description: A very loud & dangerous sword with a beam made of pure, concentrated plasma. Specially designed for syndicate cyborgs.
++
+ - type: entity
+-  suffix: One-Handed, For Borgs
+   parent: EnergySwordDouble
+   id: CyborgEnergySwordDouble # why is this invalid if ID is BorgEnergySwordDouble
++  suffix: One-Handed, For Borgs
+   description: Syndicate Command Interns thought that having one blade on the energy sword was not enough. Specially designed for syndicate cyborgs.
+   components: # could add energy-draining like the L6C
+   - type: Wieldable
+diff --git a/Resources/Prototypes/GameRules/events.yml b/Resources/Prototypes/GameRules/events.yml
+index 2642c0286b..51b1b6de62 100644
+--- a/Resources/Prototypes/GameRules/events.yml
++++ b/Resources/Prototypes/GameRules/events.yml
+@@ -32,7 +32,8 @@
+     - id: ClosetSkeleton
+     - id: KingRatMigration
+     - id: RevenantSpawn
+-    - id: DerelictCyborgSpawn
++    - !type:NestedSelector
++      tableId: DerelictBorgEventTable
+ 
+ - type: entityTable
+   id: ModerateAntagEventsTable
+@@ -45,6 +46,25 @@
+     - id: ZombieOutbreak
+     - id: LoneOpsSpawn
+     - id: WizardSpawn
++    - !type:NestedSelector
++      tableId: DerelictBorgEventTable
++
++- type: entityTable
++  id: DerelictBorgEventTable #For Derelict Borg spawns
++  table: !type:GroupSelector
++    children:
++    - !type:GroupSelector # Standard NT Borgs
++      weight: 85
++      children:
++        - id: DerelictEngineerCyborgSpawn
++        - id: DerelictGenericCyborgSpawn
++        - id: DerelictJanitorCyborgSpawn
++        - id: DerelictMedicalCyborgSpawn
++        - id: DerelictMiningCyborgSpawn
++    - !type:GroupSelector # Other Borgs
++      weight: 15
++      children:
++        - id: DerelictSyndicateAssaultCyborgSpawn
+ 
+ - type: entity
+   id: BaseStationEvent
+@@ -542,7 +562,7 @@
+     earliestStart: 35
+     weight: 5.5
+     minimumPlayers: 20
+-    duration: null # LoneOpsSpawn needs an infinite duration so that it inherits the NukeOpsRule things of an actually appropriate end scrreen (not always "Neutral outcome!") and... ending the game if the station is nuked.
++    duration: null # LoneOpsSpawn needs an infinite duration so that it inherits the NukeOpsRule things of an actually appropriate end screen (not always "Neutral outcome!") and... ending the game if the station is nuked.
+   - type: RuleGrids
+   - type: LoadMapRule
+     gridPath: /Maps/Shuttles/ShuttleEvent/striker.yml
+@@ -673,10 +693,31 @@
+ 
+ - type: entity
+   parent: BaseGameRule
+-  id: DerelictCyborgSpawn
++  id: DerelictEngineerCyborgSpawn
+   components:
+   - type: StationEvent
+-    weight: 5
++    weight: 2.5
++    earliestStart: 15
++    reoccurrenceDelay: 20
++    minimumPlayers: 4
++    duration: null
++  - type: SpaceSpawnRule
++    spawnDistance: 0
++  - type: AntagSpawner
++    prototype: PlayerEngineeringBorgDerelictGhostRole
++  - type: AntagSelection
++    definitions:
++    - spawnerPrototype: SpawnPointGhostDerelictEngineeringCyborg
++      min: 1
++      max: 1
++      pickPlayer: false
++
++- type: entity
++  parent: BaseGameRule
++  id: DerelictGenericCyborgSpawn
++  components:
++  - type: StationEvent
++    weight: 2.5
+     earliestStart: 15
+     reoccurrenceDelay: 20
+     minimumPlayers: 4
+@@ -684,10 +725,94 @@
+   - type: SpaceSpawnRule
+     spawnDistance: 0
+   - type: AntagSpawner
+-    prototype: PlayerBorgDerelict
++    prototype: PlayerBorgDerelictGhostRole
+   - type: AntagSelection
+     definitions:
+     - spawnerPrototype: SpawnPointGhostDerelictCyborg
+       min: 1
+       max: 1
+       pickPlayer: false
++
++- type: entity
++  parent: BaseGameRule
++  id: DerelictJanitorCyborgSpawn
++  components:
++  - type: StationEvent
++    weight: 2.5
++    earliestStart: 15
++    reoccurrenceDelay: 20
++    minimumPlayers: 4
++    duration: null
++  - type: SpaceSpawnRule
++    spawnDistance: 0
++  - type: AntagSpawner
++    prototype: PlayerJanitorBorgDerelictGhostRole
++  - type: AntagSelection
++    definitions:
++    - spawnerPrototype: SpawnPointGhostDerelictJanitorCyborg
++      min: 1
++      max: 1
++      pickPlayer: false
++
++- type: entity
++  parent: BaseGameRule
++  id: DerelictMedicalCyborgSpawn
++  components:
++  - type: StationEvent
++    weight: 2.5
++    earliestStart: 15
++    reoccurrenceDelay: 20
++    minimumPlayers: 4
++    duration: null
++  - type: SpaceSpawnRule
++    spawnDistance: 0
++  - type: AntagSpawner
++    prototype: PlayerMedicalBorgDerelictGhostRole
++  - type: AntagSelection
++    definitions:
++    - spawnerPrototype: SpawnPointGhostDerelictMedicalCyborg
++      min: 1
++      max: 1
++      pickPlayer: false
++
++- type: entity
++  parent: BaseGameRule
++  id: DerelictMiningCyborgSpawn
++  components:
++  - type: StationEvent
++    weight: 2.5
++    earliestStart: 15
++    reoccurrenceDelay: 20
++    minimumPlayers: 4
++    duration: null
++  - type: SpaceSpawnRule
++    spawnDistance: 0
++  - type: AntagSpawner
++    prototype: PlayerMiningBorgDerelictGhostRole
++  - type: AntagSelection
++    definitions:
++    - spawnerPrototype: SpawnPointGhostDerelictMiningCyborg
++      min: 1
++      max: 1
++      pickPlayer: false
++
++- type: entity
++  parent: BaseGameRule
++  id: DerelictSyndicateAssaultCyborgSpawn
++  components:
++  - type: StationEvent
++    weight: 2.5
++    earliestStart: 25
++    reoccurrenceDelay: 20
++    minimumPlayers: 15
++    duration: null
++  - type: SpaceSpawnRule
++    spawnDistance: 0
++  - type: AntagSpawner
++    prototype: PlayerBorgSyndicateDerelictGhostRole
++  - type: AntagSelection
++    definitions:
++    - spawnerPrototype: SpawnPointGhostDerelictSyndicateAssaultCyborg
++      min: 1
++      max: 1
++      pickPlayer: false
+diff --git a/Resources/Textures/Interface/Actions/actions_borg.rsi/meta.json b/Resources/Textures/Interface/Actions/actions_borg.rsi/meta.json
+index ac631e0294..ae485c26c5 100644
+--- a/Resources/Textures/Interface/Actions/actions_borg.rsi/meta.json
++++ b/Resources/Textures/Interface/Actions/actions_borg.rsi/meta.json
+@@ -1,7 +1,7 @@
+ {
+     "version": 1,
+     "license": "CC-BY-SA-3.0",
+-    "copyright": "Taken from vgstation at commit https://github.com/vgstation-coders/vgstation13/commit/cdbcb1e858b11f083994a7a269ed67ef5b452ce9, Module actions by Scarky0. chem, adv-chem, and adv-mining by mubururu_, xenoborg actions by Samuka-C (github), advclown by ThatGuyUSA",
++    "copyright": "Taken from vgstation at commit https://github.com/vgstation-coders/vgstation13/commit/cdbcb1e858b11f083994a7a269ed67ef5b452ce9, Module actions by Scarky0. chem, adv-chem, and adv-mining by mubururu_, xenoborg actions by Samuka-C (github), advclown by ThatGuyUSA. c20r and esword by RedBookcase on Github.",
+     "size": {
+         "x": 32,
+         "y": 32
+@@ -106,12 +106,18 @@
+         {
+             "name":"syndicate-operative-module"
+         },
++        {
++            "name":"syndicate-desword-module"
++        },
+         {
+             "name":"syndicate-esword-module"
+         },
+         {
+             "name":"syndicate-l6c-module"
+         },
++        {
++            "name":"syndicate-c20r-module"
++        },
+         {
+             "name":"syndicate-martyr-module"
+         },
+diff --git a/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-c20r-module.png b/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-c20r-module.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..52c14b26516bb4737c6e265684b8958230753d08
+GIT binary patch
+literal 675
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}oCO|{#S9Gmi6G3l!hU%s
+z0|Qg2r;B4qg!|iYTW@AZfw?M^v?5ryObHR>$=t$|k(!yh^agj-FKr#&OWte#FeWXX
+z5HFyl5-On0thttHdhxxx=ThHox)<xDCsdMnvw!yN@6X=e(Q*HBJ=%}EAW)@TwCPU2
+z<^f(crh8K9-VgV@_$@9ZEyedBI^@I@$Lu!~CNKnaFqoZURS#x5-0@qINm)Ibwc`-a
+zKhcPI)^nfgPFBol@$&3qi3{V~QMu|#k%|k;PfPPo)s0iuGc1_u*8J=3Huf;n&sxG(
+zX-T`zYE4<t;L_5R(IxhBr-i)14x8ye50t)K62|=@-byx1!#`@O3#*-)@U3Ul1$^hr
+zRtc`EoH_rvX~U~+C%^69v+?-em!UT|FeUCiGn+xuk}vVfXa6|)tFONtD|?}=Hfu{8
+zuhg5|P_q)rhk836iTh3M5jvZ^-CLm{EJ(3#X6YS{&)aq;x2<7#$Miat#kqk&=N601
+zapkh4;77I-nt0u$B|GhAF<(<|Se(HwabO|eJVm9K5#D(WGQTC(|J;$%YkjQj{FxA^
+zPA<>Qhh;fSvJbej-tcf?pA-C>)#Cf))yFHt+!n2jxtu=#hv<pOOn&n>J2Ln6S)cpl
+z%%&sh!00~7^?Ty$pWLc-r@U@BTb%k9G_fMJpkbk6QN!Xy`Av%%Z33KAo*D)+*80`W
+zoxQ1JlED7ps};wuG~PUM)M_bHQeN;QPS31!w@<UXUfSIMMw9VbaDvpskk0aXPM_v0
+zUn$u3a}L*yDI4bI3azo3ug$*5@9!LrrLIvisoNJYaVtc|cZM>UR)yND9eQ`Y{_M1+
+eZ+`vy$#%=#$otHETMGsT1_n=8KbLh*2~7a;1RrJq
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-desword-module.png b/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-desword-module.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..201149cf18e82ab28d6a834cdd2a45ea52294a84
+GIT binary patch
+literal 782
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}oCO|{#S9Gmi6G3l!hU%s
+z0|V0mPZ!6Kh}O5^zS&Za5_QQgDw;~2%LG&}$cgpaewpC>QqiP-!50<P=}ss3UudfP
+zFKqwUaA7e^|6f+sMlmlY+b0v6-YjG{Y%!@zJb3EStbONqEZ)6&-8rcozPH@XR-fx^
+z&!4f`E%f*Gwg>+<3NOCBKX6M%?<>CjCmy+9tLfg~S2??5mw4bGMcs2-8<kJXnLW&A
+zm=?9=`K<$6C*8a5a8}OXLsIEc<Nqt~afE7E+`H|lz})FEKWL+1xc+6&Uw2kyi`MVk
+zbZX<`E2gKVo?T5_aJN5T&hd9{VSoMwth_WirAkZKL9YLp#(deMiqp@mHWCOFUJ%S<
+z@S&l7;}(}=FE#g`m;7QOC+g!NUz)&c_raAXX`=Inmp@iK%VwCHRI?}ZVt-!$y=lHi
+z=H@4DY*Ip`d-U{XOsFeL;LHBdsGlUzEptNk?=rIoZYB42EzDc*y)>(}XYXDIwVD$*
+z#SJ@L`O5vS+Bk_UVZL$Q)NaBf8<Fledz8O@TW%V#cEQ%d=TB#`Ss8?Ns4%Z$Wc4!(
+z5S5T^>|Cp>6&rT6%I@&d{{GI2bqW)rWrCl_><js|-NE#Y@{9xf-hKMV^fuUy+xVi$
+zdEN=%B`Ukqn?*u{*^kXkc@(|bv9g_Wftp>3>OAQ;KP#SGN=tK)diUl1ZB`>|*~X}M
+z)zhEv`EGmS-GPRX9p*QAE*@mO_|I<Q;g*9wAy)gBX+1l`vqO~cyUdFHCbJ%C*cZ<@
+zVQrqUDe2sS2A4Pkp7WXOEw2llxVwFE!ZhZY0g@acPO+`rt7ok81u-s%o(VY56r0Qc
+z`^|+Ug`REgwPhKG6JCDZI`Oqp<D6SO2ky<Co2fki7)#O4;@xM<dACm&-ZIB8c=ydE
+z;p*yNN>{vmcyHQ4mN$<+dDSRA-<Es%ds%f6^U1HJR{GOVmb_Z}A}{~svd=ROe5<CM
+p-Z-sVddGKrweSC~zuEtn@tcFgbora^+6)W~44$rjF6*2UngB})Z)^Yn
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-esword-module.png b/Resources/Textures/Interface/Actions/actions_borg.rsi/syndicate-esword-module.png
+index 201149cf18e82ab28d6a834cdd2a45ea52294a84..944c4ee918646393b583c35fbdf96be5921c7568 100644
+GIT binary patch
+delta 514
+zcmeBU+rToxqMq@Qr;B4qg!|L!yR(=aC0hMM#10A^@n&+<(NRhDS}h_pUm;9!36GtF
+z+yNt3IftMn9Fvv{yk#nzmZWLsxhGMzIeXLMbNB9?ezR+`!zP6nT*d$1pZWQJF6+PF
+zr3=g-gdMu>FY(D~!K+pAGb)-pbRW9iT64au<HgezKR6FLX=e!3ORnM2O3`Sz=h2$F
+zkaf@OY4<e~RM;OMNHt1i$m~<Ueg7C&i$%di4<*%1?|zQJxuWkFRQugjV$wHfKU#iJ
+z;BzR)tj$ca2~V~<F=lLS2;yvCC@OZUJ=J>#bJeH1y?i3w*}wQVxfI(3?@72R^x#0H
+zO>d0}lWk?L#epQx3v+u#>#KD88?7Bq_Afm<&wBD^C8m;wNx>hF8|R*Xdtzoy0-wRB
+z-7@->4SW$3_xq`znx|j(?T$^@_p$>%aRE_p_gxRa<mZ#QefEp$lmn~I&#Wl_mg%v3
+z?w)-1H^1jhx@>v=H_yk14WgF5*0M%>p6uIwpz=_q;`fWJWlzF{`@RbtoXhyH`sO+9
+zw+9&opUg8V*cJ0oYyRUoZ<%Bkc-xg&RjdnpXm)$=soiM{WUQTZ<{qoDa$S1&*z8;P
+z_td@%n{-%af%~TlwdTC_?f=5`TNC_G_VG<ol{9s&sbyWg`qrX)^#$hjf3Kd&J^b(A
+b|NE=2>hW&86*rTCfq}u()z4*}Q$iB}<y!UG
+
+delta 738
+zcmdnM(#JNzqMqr1r;B4qMC;pd-)t#IiMnJL6-}kiWdf=f<iz@Izf5p`sc2Ha;ERgt
+zbf**iFErKt7q<UvxUiU||1Ya*qnH<y?UM;jZx*r}wwTl<9z6AE*1q#Q7VqA??wnK(
+z-&^ixtIu_|=g-*e7W(^o+k<}_g%{u6AGjr>_Z8p%6OY`l)pYN#@2i~Mu}eJgkD~6m
+zt&Pg3<;)&tGfa!x^8D6;t&{FucQ`9&@FA)6sPX@m_c%f|EbiTQRABD(m>;xJFkJt#
+z=dU{}vPJ9nZ927a@fFk4QqQiYEx6ksFz5I?x3E9|0#;s{oKmGF>>$^FOk=+6QN`(J
+zRvQTf3NHxeG5FBXzHy7ov6q_ld(TULv5*t>@sKY~;I;eU%9AwFdBe*eE1qRD%uTA<
+zlX<Z}um9dOUn6t#lQuRfA<{j1dNU@}6(#Uxe`wTC66lsWq55~3*#ozdd%G6qt@mD<
+z)!MUnuY+36iJRhv9j<)kephXrM3yk$xNd4U;gO9<_nSS+-@Yw34OqKiYvJ>!v+CKb
+z48l58m{&2f`k4iYO2{^LuGQ6w4Le$8clc<3e`m!yg$dCz!Ovs%h5Xv?VERUR#({nB
+zKK)~Q8|=nyd{N{)?}YCXmEGyhBB8<T$7ZHHir(y4+0MB@&8|dsp7fia6;Cdur8!8w
+z`||!atC6*AW7NCq>Cg9kw>|OhKtsq5^P4>N7Y{OC{AV}uaLYlT5Uc&mw4R;e*&)jJ
+zU1r68lUa{6?2Bidur^QFlyvSugG-zN&-u*tme&PN+}*x7VH)$y07;Gzr`T5R)iYN4
+zf*6-W&jg%jip}N!{pLcFLeIAL+OiD82`|5Ho%q_Qan3EC1NY|6%~YO$jHPI2@$R$b
+zyxXS>M{k+q7rguCl5lnPFQqG9KD;;WAj_LapS)_6o^Q*&{JpHYi23B#QY-!GCre%}
+zeUX=ca@psZ2EJ8OPH&u6ExqHrz1sJG*Wc{_%lOT~VY>WHcWnj+1_n=8KbLh*2~7ZY
+Cm1<`I
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/engineer_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/engineer_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..7eb8b01ad0b1496bf1bb4b5dd9315b6efa05c123
+GIT binary patch
+literal 3312
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/engineer_derelict_crystal.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/engineer_derelict_crystal.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..38bae65c83781bb3d7d150b4b4a41b8dd0cd8ba6
+GIT binary patch
+literal 1333
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$I14-?iy0XB4uUY_j)~cC
+z85mfed%8G=RK&fFip>xS7x_0S<X3<Imu9Y)_O`Q9t!%-{uH_T+;+;MVtcc8R)$LVS
+zBEX`mq@}cb@d>S^P70hR6WRlkq6;58Z~PHZpqet9J@~>81qp4}Y=NaBo!qV$-j%l}
+zw-uUw-oD%Ogsp*(TJ`&%=YGDMYyEvrF{AD*#<LA+4#o>4FYxG;v*q1&>9RX<ceVZc
+zid>Di^Xy%-o|zT=<KX%C{silOsZ+P@Hs8H+{RgAN?X0kwWtCH-*7Lr7`|tLQW7leT
+zF1UO8n*SS%t-@^VZ7NfIcTQgPIQ_LK$MRcG?{zup@;|Mg$Kv6lH@(@%T`1(^L=9nE
+z)5NbGmlvhGADh!O@$0{PM>mwQyp^xu6>wO`{QX|nisOf$PndMnaE0Tp_^FaBJ~tiz
+zzBAAH@6?CBtVg69r<oqu7Mtm^IIyR`zdCSZ%IzKdm^RI@m8h4!{*Nioj^)S8P8X%D
+zhtcmIc{Nz<sK3AVN`9%}pHB*1w@Uv?NJu!iyB}Zl`@gHw!m|1~y?fqt7ilm*t<Dd1
+z68L97`D8=*)}wv?Of4;4^;MjD(u#?DX0dQAyJPuj@#4i<PhQrz=Dd3O($Okcuj0`j
+zo6p<5xD6`=?E__Ut+dWxJ+OXD{lc%4Tb?~jQ<?0!Rcy=l?b@5PjHJbWi*lTu7WTo2
+zd0{f+zR4T?7rBLpi@UkGi8vjfU71tK|D&AmhTW6?vdEK?_vHSadGq_VNx|Rz75)aP
+zkG$d%%}h)bW}nsLIB>mbCsSAOIt3F(mLDJcs~!jax7xCGYhqQE)a?1GqKs4g&;L+v
+zSgX3aIG@99!oM<?SK6X;rm84-lpWo_`eAiJ>?5BUbLWPZYyW&-GQBKjf-L8REz_q@
+zn8p^c=E0m_cZ`fpo_%>-BIdAP)8yvOwe`$DHeBy9TYpV$%Hb(BcJlLFSF`Q+bbWUy
+zh5OWz6Rmm0T=9GUue)WgQ(CF1`6~5_x20+2@jp*LKU(1)b~p40L;o}@_FH!F^p(M8
+z!aS={^rXXsf(RxxHtU|vb1z*K`oYqvbMtw-biQ<aeaU^ptG;*3q?>vc=rg@(SDvw9
+z#m}_F2+x8awmTkdz5n@r_r+(bm)Sb){wDlXI&ku8cXcB#?}78-XS)Jz<c`0uEu1RQ
+zIp55GG7IkpmD!W6S(+QgxHqnG+gqjEt8YI0+Maro6Fbg-{}>~w#d<j8>fEFQ-#<oa
+z9L`YSU3#!&p3ssg<=Pd8-`Q;J@VvAY>{w9VSkT4eF?HJgjFne5Md`GQ9GOxis{Xd>
+zhmTIuCIhW>i3rPSBDJC~BNzixLirRYq^`Vp`h~t3s}Xlb|BdvmH_zH#KYU47S9ivY
+z839#Xtxdb?w_0Z|>F-^Zv{8cX7u(gc@{At~F5ZZ+aS9XBob>7ahN;r8x1=#nGcq=A
+zerJ1s)vC)ki#I-!eCW8uU!~XS;e7Fbm(p&@iQVr#kotdjwn56><Hjsglb-yXzbWg9
+zB^Nv2SE;pY*GfoB2S3fKo^POYv$Swld0AOfRu<R&xptoqwaM-lVtd^xQ)vIAZ+%0{
+zBEN}qd^9;NZ<ZAm3Hkc^p7LLJPJ_)=Cv9DwZqMtqcs9HK`7@4&y-NF8o0rFTWXT!#
+zS)ZS?tYMAV{+Y4wqQczAPgQ$VKY#l^@BEr4*LI!LFK=4WylahaYOmm%)-4y<KOUF$
+k-F|@w9F&byj~@6xu~*c(EN}ir1_lNOPgg&ebxsLQ09XWetN;K2
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/janitor_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/janitor_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..34ae031b79e357742b9db86daf00bac2307c8162
+GIT binary patch
+literal 4522
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$SkfJR9T^xl_H+M9WMyDr
+z;4JWnEM{QfI{?CrS=Tx_85kJbGeaUuB7A+UlJj%*5>xV%QuQiw3m8Da#=fE;F*!T6
+zL?J0PJu}Z%{r&F!>I#`Dw(8-gz6QPp&Z!xh9#uuD!Bu`C$yM3OmMQA?cD!6R6;>6w
+z1-Ypui3%0D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
+CZex@H
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/janitor_moving_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/janitor_moving_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ce6b1bc61e3578c18eacb454847dc85d28429177
+GIT binary patch
+literal 5502
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/medical_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/medical_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..8fd1dba3500b2cc60e69af3f458315982de9c313
+GIT binary patch
+literal 4171
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/medical_moving_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/medical_moving_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..4054df618449b4715e3bc16f0d2844d4097c7fcf
+GIT binary patch
+literal 4378
+zcmeAS@N?(olHy`uVBq!ia0y~yU`SwKU})fAV_;zTawlgO0|NtNage(c!@6@aFBupZ
+zSkfJR9T^xl_H+M9WMyDr;4JWnEM{QfI{?CrS=Tx_85kJbGeaUuB7A+UlJj%*5>xV%
+zQuQiw3m8Da#=fE;F*!T6L?J0PJu}Z%{r&F!>I#`Dw(8-gz6QPp&Z!xh9#uuD!Bu`C
+z$yM3OmMQA?cD!6R6;>6w1-Ypui3%0DIeEoa6}C!XgRSz4tw6&1N_I9yDQQ+gE^bg2
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/meta.json b/Resources/Textures/Mobs/Silicon/chassis.rsi/meta.json
+index 4e56b98d3e..45aa679ee2 100644
+--- a/Resources/Textures/Mobs/Silicon/chassis.rsi/meta.json
++++ b/Resources/Textures/Mobs/Silicon/chassis.rsi/meta.json
+@@ -1,659 +1,791 @@
+ {
+-  "version": 1,
+-  "size": {
+-    "x": 32,
+-    "y": 32
+-  },
+-  "license": "CC-BY-SA-3.0",
+-  "copyright": "Taken from tgstation at https://github.com/tgstation/tgstation/commit/faf6db214927874c19b8fa8585d26b5d40de1acc, derelict sprites modified by GoldenCan(GitHub), xenoborg sprites, created and modified by Samuka-C (github).",
+-  "states": [
+-    {
+-      "name": "clown",
+-      "directions": 4
+-    },
+-    {
+-      "name": "clown_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "clown_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "clown_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "derelict",
+-      "directions": 4
+-    },
+-    {
+-      "name": "derelict_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "derelict_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "derelict_icon",
+-      "directions": 1
+-    },
+-    {
+-      "name": "derelict_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "engineer",
+-      "directions": 4
+-    },
+-    {
+-      "name": "engineer_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "engineer_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "engineer_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "janitor",
+-      "directions": 4
+-    },
+-    {
+-      "name": "janitor_moving",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "janitor_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "janitor_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "janitor_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "medical",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "medical_moving",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "medical_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "medical_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "medical_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "miner",
+-      "directions": 4
+-    },
+-    {
+-      "name": "miner_moving",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "miner_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "miner_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "miner_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "robot",
+-      "directions": 4
+-    },
+-    {
+-      "name": "robot_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "robot_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "robot_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "peace",
+-      "directions": 4
+-    },
+-    {
+-      "name": "peace_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "peace_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "peace_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "service",
+-      "directions": 4
+-    },
+-    {
+-      "name": "service_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "service_e_r",
+-      "directions": 4
+-    },
+-    {
+-      "name": "service_l",
+-      "directions": 4
+-    },
+-	{
+-      "name": "synd_sec",
+-      "directions": 4
+-    },
+-    {
+-      "name": "synd_sec_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "synd_sec_l",
+-      "directions": 4
+-    },
+-	{
+-      "name": "synd_medical",
+-      "directions": 4
+-    },
+-    {
+-      "name": "synd_medical_l",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "synd_medical_e",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "synd_engi",
+-      "directions": 4
+-    },
+-	{
+-      "name": "synd_engi_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "synd_engi_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_heavy",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_heavy_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_heavy_e_r",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_heavy_l",
+-      "directions": 4
+-    },
+-	  {
+-      "name": "xenoborg_scout",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_scout_l",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_scout_e",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_scout_e_r",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_engi",
+-      "directions": 4
+-    },
+-	  {
+-      "name": "xenoborg_engi_e",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_engi_e_r",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_engi_l",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_stealth",
+-      "directions": 4
+-    },
+-    {
+-      "name": "xenoborg_stealth_e",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_stealth_e_r",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1,
+-          0.1
+-        ]
+-      ]
+-    },
+-    {
+-      "name": "xenoborg_stealth_l",
+-      "directions": 4,
+-      "delays": [
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ],
+-        [
+-          0.1,
+-          0.2,
+-          0.1
+-        ]
+-      ]
+-    }
+-  ]
++    "version": 1,
++    "size": {
++        "x": 32,
++        "y": 32
++    },
++    "license": "CC-BY-SA-3.0",
++    "copyright": "Taken from tgstation at https://github.com/tgstation/tgstation/commit/faf6db214927874c19b8fa8585d26b5d40de1acc, derelict generic sprites modified by GoldenCan(GitHub), xenoborg sprites, created and modified by Samuka-C (github). Derelict Engineer, Janitor, Miner, Medical, and Assault Borg sprites by _miket on Discord.",
++    "states": [
++        {
++            "name": "clown",
++            "directions": 4
++        },
++        {
++            "name": "clown_e",
++            "directions": 4
++        },
++        {
++            "name": "clown_e_r",
++            "directions": 4
++        },
++        {
++            "name": "clown_l",
++            "directions": 4
++        },
++        {
++            "name": "derelict",
++            "directions": 4
++        },
++        {
++            "name": "derelict_e",
++            "directions": 4
++        },
++        {
++            "name": "derelict_e_r",
++            "directions": 4
++        },
++        {
++            "name": "derelict_icon",
++            "directions": 1
++        },
++        {
++            "name": "derelict_l",
++            "directions": 4
++        },
++        {
++            "name": "engineer",
++            "directions": 4
++        },
++        {
++            "name": "engineer_e",
++            "directions": 4
++        },
++        {
++            "name": "engineer_e_r",
++            "directions": 4
++        },
++        {
++            "name": "engineer_l",
++            "directions": 4
++        },
++        {
++            "name": "engineer_derelict",
++            "directions": 4
++        },
++        {
++            "name": "engineer_derelict_crystal",
++            "directions": 4
++        },
++        {
++            "name": "janitor",
++            "directions": 4
++        },
++        {
++            "name": "janitor_moving",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "janitor_e",
++            "directions": 4
++        },
++        {
++            "name": "janitor_e_r",
++            "directions": 4
++        },
++        {
++            "name": "janitor_l",
++            "directions": 4
++        },
++        {
++            "name": "janitor_derelict",
++            "directions": 4
++        },
++        {
++            "name": "janitor_moving_derelict",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "medical",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "medical_moving",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "medical_e",
++            "directions": 4
++        },
++        {
++            "name": "medical_e_r",
++            "directions": 4
++        },
++        {
++            "name": "medical_l",
++            "directions": 4
++        },
++        {
++            "name": "medical_derelict",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "medical_moving_derelict",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "miner",
++            "directions": 4
++        },
++        {
++            "name": "miner_moving",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "miner_e",
++            "directions": 4
++        },
++        {
++            "name": "miner_e_r",
++            "directions": 4
++        },
++        {
++            "name": "miner_l",
++            "directions": 4
++        },
++        {
++            "name": "miner_derelict",
++            "directions": 4
++        },
++        {
++            "name": "miner_moving_derelict",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "robot",
++            "directions": 4
++        },
++        {
++            "name": "robot_e",
++            "directions": 4
++        },
++        {
++            "name": "robot_e_r",
++            "directions": 4
++        },
++        {
++            "name": "robot_l",
++            "directions": 4
++        },
++        {
++            "name": "peace",
++            "directions": 4
++        },
++        {
++            "name": "peace_e",
++            "directions": 4
++        },
++        {
++            "name": "peace_e_r",
++            "directions": 4
++        },
++        {
++            "name": "peace_l",
++            "directions": 4
++        },
++        {
++            "name": "service",
++            "directions": 4
++        },
++        {
++            "name": "service_e",
++            "directions": 4
++        },
++        {
++            "name": "service_e_r",
++            "directions": 4
++        },
++        {
++            "name": "service_l",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec_e",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec_l",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec_derelict",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec_derelict_e",
++            "directions": 4
++        },
++        {
++            "name": "synd_sec_derelict_l",
++            "directions": 4
++        },
++        {
++            "name": "synd_medical",
++            "directions": 4
++        },
++        {
++            "name": "synd_medical_l",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "synd_medical_e",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "synd_engi",
++            "directions": 4
++        },
++        {
++            "name": "synd_engi_e",
++            "directions": 4
++        },
++        {
++            "name": "synd_engi_l",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_heavy",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_heavy_e",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_heavy_e_r",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_heavy_l",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_scout",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_scout_l",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_scout_e",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_scout_e_r",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_engi",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_engi_e",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_engi_e_r",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_engi_l",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_stealth",
++            "directions": 4
++        },
++        {
++            "name": "xenoborg_stealth_e",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_stealth_e_r",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "xenoborg_stealth_l",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1
++                ]
++            ]
++        }
++    ]
+ }
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/miner_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/miner_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9d812c761186f3e217ba7a19fc7c7ddede660fc
+GIT binary patch
+literal 3494
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/miner_moving_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/miner_moving_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..05cd74494b9ed619710539db47e03e6a388e5c83
+GIT binary patch
+literal 4363
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b42b90f6edcbd77339c7684d220c80215e36365
+GIT binary patch
+literal 3707
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$SkfJR9T^xl_H+M9WMyDr
+z;4JWnEM{QfI{?CrS=Tx_85kJbGeaUuB7A+UlJj%*5>xV%QuQiw3m8Da#=fE;F*!T6
+zL?J0PJu}Z%{r&F!>I#`Dw(8-gz6QPp&Z!xh9#uuD!Bu`C$yM3OmMQA?cD!6R6;>6w
+z1-Ypui3%0D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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict_e.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict_e.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a846febc061e5d2212d831c5ed154a6d26148867
+GIT binary patch
+literal 824
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z`&C3
+z=<CS9u(6-}Pa-P=0|RG)M`SSr1K&XqX529``z-?lV|!*uL`j6Nk5zJhu3lnFep0Gl
+zMQ#BD2-w(H6eK2Rr<N!rrKV@**{Z+ay<c4+GsRXt+|<{=x4=0yBh#a*C^fjsFC@7t
+zJJ~Wt-QJFu%cjDrBDWwnwIorYA~z?m*s8)-32d-cUa=KOSYOG`rYI%ND#*nRs-h?*
+z%~mO+q@=(~U%$M(T(8_%FTW^V-_X+1Qs2Nx-^fU}C?!p|xH7LKu|hYmSQ%=7OKNd)
+zQD#9&W`3Rm$iT#;{L&IzrP9*O6sxqvG}EM%6jR-#MB@})L&KCr-NY1QL){c(;}mmK
+zLkpuc!z3lB^(C2U2>bJjp}~-xpQ{g&(KpmH067`Nw(>8^OwB7v1X*ckXakl<5wp<;
+zIRwdJb`X&u7dJZ_eR#-#f(ahFsd*{3>gDS8b~;mLa5FG4DtNj$hE&A8z2%s7*g(MH
+z;>z%}D1(C~xf2inFxuCU|3Fy9*3&%lyVyasmUp+E40KyoXtOH@6@*Gp`LchiNydR5
+z6=|JL1_p))>7mo2w%?c3-R^eXcipy=SMz$;Sub8{ee8T^=p%N$$l98FJO4gicV8v!
+z+xp{^J33UtzMYQUUwHh7W$<b-{^v})-$u5aN%J_D?-SavK-3_O`-kO5sZfS`v*S68
+z_UT!xw;$elAWyoOW9HcjG7Q_*zm*?casGks@9&_r21-8y%Z#J8wO$LIc1!L0$^R_o
+zJ8x-u=SF9|l|SN^YGL~AalPprr{9G~l6Dvyd>7kMBCe>FyYOoaYX<k)zZMJ(57#}a
+zx_SBW-dg*}%AZ1&c3;9jo&hEIC;J$CUsg?D<oZj1fq{W9HNrE^*Ox(yfq{VoWGMp!
+S!=>QKAeN`ApUXO@geCw6f-Cs|
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict_l.png b/Resources/Textures/Mobs/Silicon/chassis.rsi/synd_sec_derelict_l.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b479c411a7a39f04873c99344af18197598f3573
+GIT binary patch
+literal 924
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z`&C3
+z=<CS9u(6-}Pa-P=0|RG)M`SSr1K%MKW)#)%YG7bsY|jjdD2ed(u}aR*)k{ptPfFFR
+z$Sq(10UP^@g2d$P)DnfH)bz|eTlM$5_p2*prr4^7oBA5~7C5J7WO`H;r3P2|g(O#H
+zCtIed+uQMS*;H6n<QC+nmLw`v<mTiRTUFR9fep6GE4Bg&>nqvW6s4qD1-ZCERTQP9
+z*(zm}loVL$>z9|8>y;bp<rk&v8(Lag>Khp88yV>qrKIT=SLT%@R_NvxD?<%%Ni9w;
+z$}A|!%+FH*8JL)qUs__TR9c#uVwIMdW}1|eVyc^zXq=*JXqb|yo0wv3sGDMJoMLWj
+zXknCQn4|=?z9cgZVSipRG#HZebM-+o`i6Q2ASZ*^R{lkqsd*)dAS>+*ZNTy<VmA69
+zhafr34k8ld;$~-~4-XkoFu_ANH7~_hy<FYiPG`ytZUzR%7Ec$)kczmsw+!<R8HgPF
+zSZ}0O;`Bx^`~8K9OTESU4hjaOAGv1Qo{*UKM%Jq7hIZSkT(>){;R%6L4s2Gq`u%pn
+zgOg_OPX@+0xVX5S+o-ka;HndB4=ZM?Jamw)yBK}k*kP6d<BRpHU4Pt-4$o#@cK1xL
+zdFUpsO$Wv1F%;Z6zpsKpqO3yoA+JJfWqqvfsknD;@9%GY6dx?bCu4jsgmZVjMQdfn
+z-Ot_Z8HXQb&SLymJXa{go6Tfa!ek+ix~k1tQx9yJZ7DU);pXYsioar}rx@1zasJV^
+zV|H5pj``LkMx{^Y-B#N=3QbQx`gAh-NXN@3wFgcgk6iwQv0Fk33X)FzDLh*@|G=t1
+zA?0Q1+Zfqv56gDjC9c^q?<CtFzoPYtTn2j<?@8HY_wLQ)iSnO&Z+Jg?XZ<r^i{5>c
+zueOI~Tx#jO`e@@R2Bl?LU@a?HLYO`VnTExj&tc{`m(6qjO+=xq%Ng4;qwP9H=|7WP
+zZl1oo>BQaS=RZzIfn9Lv2LJZmH|K25o5je$z`&Op;hE;^%b>-;z`y~@7z_*ymx3pQ
+NSe~waF6*2UngD9%U?>0p
+
+literal 0
+HcmV?d00001
+

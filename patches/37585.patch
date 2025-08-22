@@ -1,0 +1,1400 @@
+diff --git a/Content.Client/Anomaly/AnomalyScannerScreenComponent.cs b/Content.Client/Anomaly/AnomalyScannerScreenComponent.cs
+new file mode 100644
+index 0000000000..8e0b911fb7
+--- /dev/null
++++ b/Content.Client/Anomaly/AnomalyScannerScreenComponent.cs
+@@ -0,0 +1,40 @@
++using Robust.Client.Graphics;
++using SixLabors.ImageSharp.PixelFormats;
++
++namespace Content.Client.Anomaly;
++
++/// <summary>
++/// This component creates and handles the drawing of a ScreenTexture to be used on the Anomaly Scanner
++/// for an indicator of Anomaly Severity.
++/// </summary>
++/// <remarks>
++/// In the future I would like to make this a more generic "DynamicTextureComponent" that can contain a dictionary
++/// of texture components like "Bar(offset, size, minimumValue, maximumValue, AppearanceKey, LayerMapKey)" that can
++/// just draw a bar or other basic drawn element that will show up on a texture layer.
++/// </remarks>
++[RegisterComponent]
++[Access(typeof(AnomalyScannerSystem))]
++public sealed partial class AnomalyScannerScreenComponent : Component
++{
++    /// <summary>
++    /// This is the texture drawn as a layer on the Anomaly Scanner device.
++    /// </summary>
++    public OwnedTexture? ScreenTexture;
++
++    /// <summary>
++    /// A small buffer that we can reuse to draw the severity bar.
++    /// </summary>
++    public Rgba32[]? BarBuf;
++
++    /// <summary>
++    /// The position of the top-left of the severity bar in pixels.
++    /// </summary>
++    [DataField(readOnly: true)]
++    public Vector2i Offset = new Vector2i(12, 17);
++
++    /// <summary>
++    /// The width and height of the severity bar in pixels.
++    /// </summary>
++    [DataField(readOnly: true)]
++    public Vector2i Size = new Vector2i(10, 3);
++}
+diff --git a/Content.Client/Anomaly/AnomalyScannerSystem.cs b/Content.Client/Anomaly/AnomalyScannerSystem.cs
+new file mode 100644
+index 0000000000..f80e5ead54
+--- /dev/null
++++ b/Content.Client/Anomaly/AnomalyScannerSystem.cs
+@@ -0,0 +1,110 @@
++using System.Numerics;
++using Content.Shared.Anomaly;
++using Robust.Client.GameObjects;
++using Robust.Client.Graphics;
++using Robust.Shared.Utility;
++using SixLabors.ImageSharp.PixelFormats;
++
++namespace Content.Client.Anomaly;
++
++/// <inheritdoc cref="SharedAnomalyScannerSystem"/>
++public sealed class AnomalyScannerSystem : SharedAnomalyScannerSystem
++{
++    [Dependency] private readonly IClyde _clyde = default!;
++    [Dependency] private readonly SpriteSystem _sprite = default!;
++
++    private const float MaxHueDegrees = 360f;
++    private const float GreenHueDegrees = 110f;
++    private const float RedHueDegrees = 0f;
++    private const float GreenHue = GreenHueDegrees / MaxHueDegrees;
++    private const float RedHue = RedHueDegrees / MaxHueDegrees;
++
++
++    // Just an array to initialize the pixels of a new OwnedTexture
++    private static readonly Rgba32[] EmptyTexture = new Rgba32[32*32];
++
++    public override void Initialize()
++    {
++        base.Initialize();
++
++        SubscribeLocalEvent<AnomalyScannerScreenComponent, ComponentInit>(OnComponentInit);
++        SubscribeLocalEvent<AnomalyScannerScreenComponent, ComponentStartup>(OnComponentStartup);
++        SubscribeLocalEvent<AnomalyScannerScreenComponent, AppearanceChangeEvent>(OnScannerAppearanceChanged);
++    }
++
++    private void OnComponentInit(Entity<AnomalyScannerScreenComponent> ent, ref ComponentInit args)
++    {
++        if(!_sprite.TryGetLayer(ent.Owner, AnomalyScannerVisualLayers.Base, out var layer, true))
++            return;
++
++        // Allocate the OwnedTexture
++        ent.Comp.ScreenTexture = _clyde.CreateBlankTexture<Rgba32>(layer.PixelSize);
++
++        if (layer.PixelSize.X < ent.Comp.Offset.X + ent.Comp.Size.X ||
++            layer.PixelSize.Y < ent.Comp.Offset.Y + ent.Comp.Size.Y)
++        {
++            // If the bar doesn't fit, just bail here, ScreenTexture and BarBuf will remain null, and appearance updates
++            // will do nothing.
++            DebugTools.Assert(false, "AnomalyScannerScreenComponent: Bar does not fit within sprite");
++            return;
++        }
++
++
++        // Initialize the texture
++        ent.Comp.ScreenTexture.SetSubImage((0, 0), layer.PixelSize, new ReadOnlySpan<Rgba32>(EmptyTexture));
++
++        // Initialize bar drawing buffer
++        ent.Comp.BarBuf = new Rgba32[ent.Comp.Size.X * ent.Comp.Size.Y];
++    }
++
++    private void OnComponentStartup(Entity<AnomalyScannerScreenComponent> ent, ref ComponentStartup args)
++    {
++        if (!TryComp<SpriteComponent>(ent, out var sprite))
++            return;
++
++        _sprite.LayerSetTexture((ent, sprite), AnomalyScannerVisualLayers.Screen, ent.Comp.ScreenTexture);
++    }
++
++    private void OnScannerAppearanceChanged(Entity<AnomalyScannerScreenComponent> ent, ref AppearanceChangeEvent args)
++    {
++        if (args.Sprite is null || ent.Comp.ScreenTexture is null || ent.Comp.BarBuf is null)
++            return;
++
++        args.AppearanceData.TryGetValue(AnomalyScannerVisuals.AnomalySeverity, out var severityObj);
++        if (severityObj is not float severity)
++            severity = 0;
++
++        // Get the bar length
++        var barLength = (int)(severity * ent.Comp.Size.X);
++
++        // Calculate the bar color
++        // Hue "angle" of two colors to interpolate between depending on severity
++        // Just a lerp from Green hue at severity = 0.5 to Red hue at 1.0
++        var hue = Math.Clamp(2*GreenHue * (1 - severity), RedHue, GreenHue);
++        var color = new Rgba32(Color.FromHsv(new Vector4(hue, 1f, 1f, 1f)).RGBA);
++
++        var transparent = new Rgba32(0, 0, 0, 255);
++
++        for(var y = 0; y < ent.Comp.Size.Y; y++)
++        {
++            for (var x = 0; x < ent.Comp.Size.X; x++)
++            {
++                ent.Comp.BarBuf[y*ent.Comp.Size.X + x]  = x < barLength ? color : transparent;
++            }
++        }
++
++        // Copy the buffer to the texture
++        try
++        {
++            ent.Comp.ScreenTexture.SetSubImage(
++                ent.Comp.Offset,
++                ent.Comp.Size,
++                new ReadOnlySpan<Rgba32>(ent.Comp.BarBuf)
++            );
++        }
++        catch (IndexOutOfRangeException)
++        {
++            Log.Warning($"Bar dimensions out of bounds with the texture on entity {ent.Owner}");
++        }
++    }
++}
+diff --git a/Content.Client/Anomaly/AnomalySystem.cs b/Content.Client/Anomaly/AnomalySystem.cs
+index 4eee43fac6..b4bc6efdd2 100644
+--- a/Content.Client/Anomaly/AnomalySystem.cs
++++ b/Content.Client/Anomaly/AnomalySystem.cs
+@@ -7,7 +7,7 @@
+ 
+ namespace Content.Client.Anomaly;
+ 
+-public sealed class AnomalySystem : SharedAnomalySystem
++public sealed partial class AnomalySystem : SharedAnomalySystem
+ {
+     [Dependency] private readonly IGameTiming _timing = default!;
+     [Dependency] private readonly FloatingVisualizerSystem _floating = default!;
+@@ -24,6 +24,7 @@ public override void Initialize()
+ 
+         SubscribeLocalEvent<AnomalySupercriticalComponent, ComponentShutdown>(OnShutdown);
+     }
++
+     private void OnStartup(EntityUid uid, AnomalyComponent component, ComponentStartup args)
+     {
+         _floating.FloatAnimation(uid, component.FloatingOffset, component.AnimationKey, component.AnimationTime);
+diff --git a/Content.Server/Anomaly/AnomalyScannerSystem.cs b/Content.Server/Anomaly/AnomalyScannerSystem.cs
+new file mode 100644
+index 0000000000..ba657cf056
+--- /dev/null
++++ b/Content.Server/Anomaly/AnomalyScannerSystem.cs
+@@ -0,0 +1,185 @@
++using Content.Server.Anomaly.Components;
++using Content.Server.Anomaly.Effects;
++using Content.Shared.Anomaly;
++using Content.Shared.Anomaly.Components;
++using Content.Shared.DoAfter;
++
++namespace Content.Server.Anomaly;
++
++/// <inheritdoc cref="SharedAnomalyScannerSystem"/>
++public sealed class AnomalyScannerSystem : SharedAnomalyScannerSystem
++{
++    [Dependency] private readonly SecretDataAnomalySystem _secretData = default!;
++    [Dependency] private readonly AnomalySystem _anomaly = default!;
++
++    public override void Initialize()
++    {
++        base.Initialize();
++
++        SubscribeLocalEvent<AnomalySeverityChangedEvent>(OnScannerAnomalySeverityChanged);
++        SubscribeLocalEvent<AnomalyStabilityChangedEvent>(OnScannerAnomalyStabilityChanged);
++        SubscribeLocalEvent<AnomalyHealthChangedEvent>(OnScannerAnomalyHealthChanged);
++        SubscribeLocalEvent<AnomalyBehaviorChangedEvent>(OnScannerAnomalyBehaviorChanged);
++
++        Subs.BuiEvents<AnomalyScannerComponent>(
++            AnomalyScannerUiKey.Key,
++            subs => subs.Event<BoundUIOpenedEvent>(OnScannerUiOpened)
++        );
++    }
++
++    /// <summary> Updates device with passed anomaly data. </summary>
++    public void UpdateScannerWithNewAnomaly(EntityUid scanner, EntityUid anomaly, AnomalyScannerComponent? scannerComp = null, AnomalyComponent? anomalyComp = null)
++    {
++        if (!Resolve(scanner, ref scannerComp) || !Resolve(anomaly, ref anomalyComp))
++            return;
++
++        scannerComp.ScannedAnomaly = anomaly;
++        UpdateScannerUi(scanner, scannerComp);
++
++        TryComp<AppearanceComponent>(scanner, out var appearanceComp);
++        TryComp<SecretDataAnomalyComponent>(anomaly, out var secretDataComp);
++
++        Appearance.SetData(scanner, AnomalyScannerVisuals.HasAnomaly, true, appearanceComp);
++
++        var stability = _secretData.IsSecret(anomaly, AnomalySecretData.Stability, secretDataComp)
++            ? AnomalyStabilityVisuals.Stable
++            : _anomaly.GetStabilityVisualOrStable((anomaly, anomalyComp));
++        Appearance.SetData(scanner, AnomalyScannerVisuals.AnomalyStability, stability, appearanceComp);
++
++        var severity = _secretData.IsSecret(anomaly, AnomalySecretData.Severity, secretDataComp)
++            ? 0
++            : anomalyComp.Severity;
++        Appearance.SetData(scanner, AnomalyScannerVisuals.AnomalySeverity, severity, appearanceComp);
++    }
++
++    /// <summary> Update scanner interface. </summary>
++    public void UpdateScannerUi(EntityUid uid, AnomalyScannerComponent? component = null)
++    {
++        if (!Resolve(uid, ref component))
++            return;
++
++        TimeSpan? nextPulse = null;
++        if (TryComp<AnomalyComponent>(component.ScannedAnomaly, out var anomalyComponent))
++            nextPulse = anomalyComponent.NextPulseTime;
++
++        var state = new AnomalyScannerUserInterfaceState(_anomaly.GetScannerMessage(component), nextPulse);
++        UI.SetUiState(uid, AnomalyScannerUiKey.Key, state);
++    }
++
++    /// <inheritdoc />
++    public override void Update(float frameTime)
++    {
++        base.Update(frameTime);
++
++        var anomalyQuery = EntityQueryEnumerator<AnomalyComponent>();
++        while (anomalyQuery.MoveNext(out var ent, out var anomaly))
++        {
++            var secondsUntilNextPulse = (anomaly.NextPulseTime - Timing.CurTime).TotalSeconds;
++            UpdateScannerPulseTimers((ent, anomaly),  secondsUntilNextPulse);
++        }
++    }
++
++    /// <inheritdoc />
++    protected override void OnDoAfter(EntityUid uid, AnomalyScannerComponent component, DoAfterEvent args)
++    {
++        if (args.Cancelled || args.Handled || args.Args.Target == null)
++            return;
++
++        base.OnDoAfter(uid, component, args);
++
++        UpdateScannerWithNewAnomaly(uid, args.Args.Target.Value, component);
++    }
++
++    private void OnScannerAnomalyHealthChanged(ref AnomalyHealthChangedEvent args)
++    {
++        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (query.MoveNext(out var uid, out var component))
++        {
++            if (component.ScannedAnomaly != args.Anomaly)
++                continue;
++
++            UpdateScannerUi(uid, component);
++        }
++    }
++
++    private void OnScannerUiOpened(EntityUid uid, AnomalyScannerComponent component, BoundUIOpenedEvent args)
++    {
++        UpdateScannerUi(uid, component);
++    }
++
++    private void OnScannerAnomalySeverityChanged(ref AnomalySeverityChangedEvent args)
++    {
++        var severity = _secretData.IsSecret(args.Anomaly, AnomalySecretData.Severity) ? 0 : args.Severity;
++        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (query.MoveNext(out var uid, out var component))
++        {
++            if (component.ScannedAnomaly != args.Anomaly)
++                continue;
++
++            UpdateScannerUi(uid, component);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalySeverity, severity);
++        }
++    }
++
++    private void OnScannerAnomalyStabilityChanged(ref AnomalyStabilityChangedEvent args)
++    {
++        var stability = _secretData.IsSecret(args.Anomaly, AnomalySecretData.Stability)
++            ? AnomalyStabilityVisuals.Stable
++            : _anomaly.GetStabilityVisualOrStable(args.Anomaly);
++        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (query.MoveNext(out var uid, out var component))
++        {
++            if (component.ScannedAnomaly != args.Anomaly)
++                continue;
++
++            UpdateScannerUi(uid, component);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalyStability, stability);
++        }
++    }
++
++    private void OnScannerAnomalyBehaviorChanged(ref AnomalyBehaviorChangedEvent args)
++    {
++        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (query.MoveNext(out var uid, out var component))
++        {
++            if (component.ScannedAnomaly != args.Anomaly)
++                continue;
++
++            UpdateScannerUi(uid, component);
++            // If a field becomes secret, we want to set it to 0 or stable
++            // If a field becomes visible, we need to set it to the correct value, so we need to get the AnomalyComponent
++            if (!TryComp<AnomalyComponent>(args.Anomaly, out var anomalyComp))
++                return;
++
++            TryComp<AppearanceComponent>(uid, out var appearanceComp);
++            TryComp<SecretDataAnomalyComponent>(args.Anomaly, out var secretDataComp);
++
++            var severity = _secretData.IsSecret(args.Anomaly, AnomalySecretData.Severity, secretDataComp)
++                ? 0
++                : anomalyComp.Severity;
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalySeverity, severity, appearanceComp);
++
++            var stability = _secretData.IsSecret(args.Anomaly, AnomalySecretData.Stability, secretDataComp)
++                ? AnomalyStabilityVisuals.Stable
++                : _anomaly.GetStabilityVisualOrStable((args.Anomaly, anomalyComp));
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalyStability, stability, appearanceComp);
++        }
++    }
++
++    private void UpdateScannerPulseTimers(Entity<AnomalyComponent> anomalyEnt, double secondsUntilNextPulse)
++    {
++        if (secondsUntilNextPulse > 5)
++            return;
++
++        var rounded = Math.Max(0, (int)Math.Ceiling(secondsUntilNextPulse));
++
++        var scannerQuery = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (scannerQuery.MoveNext(out var scannerUid, out var scanner))
++        {
++            if (scanner.ScannedAnomaly != anomalyEnt)
++                continue;
++
++            Appearance.SetData(scannerUid, AnomalyScannerVisuals.AnomalyNextPulse, rounded);
++        }
++    }
++}
+diff --git a/Content.Server/Anomaly/AnomalySystem.Scanner.cs b/Content.Server/Anomaly/AnomalySystem.Scanner.cs
+deleted file mode 100644
+index 9d81878cd8..0000000000
+--- a/Content.Server/Anomaly/AnomalySystem.Scanner.cs
++++ /dev/null
+@@ -1,241 +0,0 @@
+-using Content.Server.Anomaly.Components;
+-using Content.Shared.Anomaly;
+-using Content.Shared.Anomaly.Components;
+-using Content.Shared.DoAfter;
+-using Content.Shared.Interaction;
+-using Robust.Shared.Player;
+-using Robust.Shared.Utility;
+-
+-namespace Content.Server.Anomaly;
+-
+-/// <summary>
+-/// This handles the anomaly scanner and it's UI updates.
+-/// </summary>
+-public sealed partial class AnomalySystem
+-{
+-    private void InitializeScanner()
+-    {
+-        SubscribeLocalEvent<AnomalyScannerComponent, BoundUIOpenedEvent>(OnScannerUiOpened);
+-        SubscribeLocalEvent<AnomalyScannerComponent, AfterInteractEvent>(OnScannerAfterInteract);
+-        SubscribeLocalEvent<AnomalyScannerComponent, ScannerDoAfterEvent>(OnDoAfter);
+-
+-        SubscribeLocalEvent<AnomalySeverityChangedEvent>(OnScannerAnomalySeverityChanged);
+-        SubscribeLocalEvent<AnomalyHealthChangedEvent>(OnScannerAnomalyHealthChanged);
+-        SubscribeLocalEvent<AnomalyBehaviorChangedEvent>(OnScannerAnomalyBehaviorChanged);
+-    }
+-
+-    private void OnScannerAnomalyShutdown(ref AnomalyShutdownEvent args)
+-    {
+-        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
+-        while (query.MoveNext(out var uid, out var component))
+-        {
+-            if (component.ScannedAnomaly != args.Anomaly)
+-                continue;
+-
+-            _ui.CloseUi(uid, AnomalyScannerUiKey.Key);
+-        }
+-    }
+-
+-    private void OnScannerAnomalySeverityChanged(ref AnomalySeverityChangedEvent args)
+-    {
+-        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
+-        while (query.MoveNext(out var uid, out var component))
+-        {
+-            if (component.ScannedAnomaly != args.Anomaly)
+-                continue;
+-            UpdateScannerUi(uid, component);
+-        }
+-    }
+-
+-    private void OnScannerAnomalyStabilityChanged(ref AnomalyStabilityChangedEvent args)
+-    {
+-        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
+-        while (query.MoveNext(out var uid, out var component))
+-        {
+-            if (component.ScannedAnomaly != args.Anomaly)
+-                continue;
+-            UpdateScannerUi(uid, component);
+-        }
+-    }
+-
+-    private void OnScannerAnomalyHealthChanged(ref AnomalyHealthChangedEvent args)
+-    {
+-        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
+-        while (query.MoveNext(out var uid, out var component))
+-        {
+-            if (component.ScannedAnomaly != args.Anomaly)
+-                continue;
+-            UpdateScannerUi(uid, component);
+-        }
+-    }
+-
+-    private void OnScannerAnomalyBehaviorChanged(ref AnomalyBehaviorChangedEvent args)
+-    {
+-        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
+-        while (query.MoveNext(out var uid, out var component))
+-        {
+-            if (component.ScannedAnomaly != args.Anomaly)
+-                continue;
+-            UpdateScannerUi(uid, component);
+-        }
+-    }
+-
+-    private void OnScannerUiOpened(EntityUid uid, AnomalyScannerComponent component, BoundUIOpenedEvent args)
+-    {
+-        UpdateScannerUi(uid, component);
+-    }
+-
+-    private void OnScannerAfterInteract(EntityUid uid, AnomalyScannerComponent component, AfterInteractEvent args)
+-    {
+-        if (args.Target is not { } target)
+-            return;
+-        if (!HasComp<AnomalyComponent>(target))
+-            return;
+-        if (!args.CanReach)
+-            return;
+-
+-        _doAfter.TryStartDoAfter(new DoAfterArgs(EntityManager, args.User, component.ScanDoAfterDuration, new ScannerDoAfterEvent(), uid, target: target, used: uid)
+-        {
+-            DistanceThreshold = 2f
+-        });
+-    }
+-
+-    private void OnDoAfter(EntityUid uid, AnomalyScannerComponent component, DoAfterEvent args)
+-    {
+-        if (args.Cancelled || args.Handled || args.Args.Target == null)
+-            return;
+-
+-        Audio.PlayPvs(component.CompleteSound, uid);
+-        Popup.PopupEntity(Loc.GetString("anomaly-scanner-component-scan-complete"), uid);
+-        UpdateScannerWithNewAnomaly(uid, args.Args.Target.Value, component);
+-
+-        _ui.OpenUi(uid, AnomalyScannerUiKey.Key, args.User);
+-
+-        args.Handled = true;
+-    }
+-
+-    public void UpdateScannerUi(EntityUid uid, AnomalyScannerComponent? component = null)
+-    {
+-        if (!Resolve(uid, ref component))
+-            return;
+-
+-        TimeSpan? nextPulse = null;
+-        if (TryComp<AnomalyComponent>(component.ScannedAnomaly, out var anomalyComponent))
+-            nextPulse = anomalyComponent.NextPulseTime;
+-
+-        var state = new AnomalyScannerUserInterfaceState(GetScannerMessage(component), nextPulse);
+-        _ui.SetUiState(uid, AnomalyScannerUiKey.Key, state);
+-    }
+-
+-    public void UpdateScannerWithNewAnomaly(EntityUid scanner, EntityUid anomaly, AnomalyScannerComponent? scannerComp = null, AnomalyComponent? anomalyComp = null)
+-    {
+-        if (!Resolve(scanner, ref scannerComp) || !Resolve(anomaly, ref anomalyComp))
+-            return;
+-
+-        scannerComp.ScannedAnomaly = anomaly;
+-        UpdateScannerUi(scanner, scannerComp);
+-    }
+-
+-    public FormattedMessage GetScannerMessage(AnomalyScannerComponent component)
+-    {
+-        var msg = new FormattedMessage();
+-        if (component.ScannedAnomaly is not { } anomaly || !TryComp<AnomalyComponent>(anomaly, out var anomalyComp))
+-        {
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-no-anomaly"));
+-            return msg;
+-        }
+-
+-        TryComp<SecretDataAnomalyComponent>(anomaly, out var secret);
+-
+-        //Severity
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.Severity))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-severity-percentage-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-severity-percentage", ("percent", anomalyComp.Severity.ToString("P"))));
+-        msg.PushNewline();
+-
+-        //Stability
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.Stability))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-stability-unknown"));
+-        else
+-        {
+-            string stateLoc;
+-            if (anomalyComp.Stability < anomalyComp.DecayThreshold)
+-                stateLoc = Loc.GetString("anomaly-scanner-stability-low");
+-            else if (anomalyComp.Stability > anomalyComp.GrowthThreshold)
+-                stateLoc = Loc.GetString("anomaly-scanner-stability-high");
+-            else
+-                stateLoc = Loc.GetString("anomaly-scanner-stability-medium");
+-            msg.AddMarkupOrThrow(stateLoc);
+-        }
+-        msg.PushNewline();
+-
+-        //Point output
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.OutputPoint))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-point-output-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-point-output", ("point", GetAnomalyPointValue(anomaly, anomalyComp))));
+-        msg.PushNewline();
+-        msg.PushNewline();
+-
+-        //Particles title
+-        msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-readout"));
+-        msg.PushNewline();
+-
+-        //Danger
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleDanger))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-danger-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-danger", ("type", GetParticleLocale(anomalyComp.SeverityParticleType))));
+-        msg.PushNewline();
+-
+-        //Unstable
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleUnstable))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-unstable-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-unstable", ("type", GetParticleLocale(anomalyComp.DestabilizingParticleType))));
+-        msg.PushNewline();
+-
+-        //Containment
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleContainment))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-containment-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-containment", ("type", GetParticleLocale(anomalyComp.WeakeningParticleType))));
+-        msg.PushNewline();
+-
+-        //Transformation
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleTransformation))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-transformation-unknown"));
+-        else
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-transformation", ("type", GetParticleLocale(anomalyComp.TransformationParticleType))));
+-
+-
+-        //Behavior
+-        msg.PushNewline();
+-        msg.PushNewline();
+-        msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-title"));
+-        msg.PushNewline();
+-
+-        if (secret != null && secret.Secret.Contains(AnomalySecretData.Behavior))
+-            msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-unknown"));
+-        else
+-        {
+-            if (anomalyComp.CurrentBehavior != null)
+-            {
+-                var behavior = _prototype.Index(anomalyComp.CurrentBehavior.Value);
+-
+-                msg.AddMarkupOrThrow("- " + Loc.GetString(behavior.Description));
+-                msg.PushNewline();
+-                var mod = Math.Floor((behavior.EarnPointModifier) * 100);
+-                msg.AddMarkupOrThrow("- " + Loc.GetString("anomaly-behavior-point", ("mod", mod)));
+-            }
+-            else
+-            {
+-                msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-balanced"));
+-            }
+-        }
+-
+-        //The timer at the end here is actually added in the ui itself.
+-        return msg;
+-    }
+-}
+diff --git a/Content.Server/Anomaly/AnomalySystem.Vessel.cs b/Content.Server/Anomaly/AnomalySystem.Vessel.cs
+index 98e56a8844..0900f3e96f 100644
+--- a/Content.Server/Anomaly/AnomalySystem.Vessel.cs
++++ b/Content.Server/Anomaly/AnomalySystem.Vessel.cs
+@@ -22,20 +22,7 @@ private void InitializeVessel()
+         SubscribeLocalEvent<AnomalyVesselComponent, InteractUsingEvent>(OnVesselInteractUsing);
+         SubscribeLocalEvent<AnomalyVesselComponent, ExaminedEvent>(OnExamined);
+         SubscribeLocalEvent<AnomalyVesselComponent, ResearchServerGetPointsPerSecondEvent>(OnVesselGetPointsPerSecond);
+-        SubscribeLocalEvent<AnomalyShutdownEvent>(OnShutdown);
+-        SubscribeLocalEvent<AnomalyStabilityChangedEvent>(OnStabilityChanged);
+-    }
+-
+-    private void OnStabilityChanged(ref AnomalyStabilityChangedEvent args)
+-    {
+-        OnVesselAnomalyStabilityChanged(ref args);
+-        OnScannerAnomalyStabilityChanged(ref args);
+-    }
+-
+-    private void OnShutdown(ref AnomalyShutdownEvent args)
+-    {
+-        OnVesselAnomalyShutdown(ref args);
+-        OnScannerAnomalyShutdown(ref args);
++        SubscribeLocalEvent<AnomalyShutdownEvent>(OnVesselAnomalyShutdown);
+     }
+ 
+     private void OnExamined(EntityUid uid, AnomalyVesselComponent component, ExaminedEvent args)
+@@ -141,21 +128,10 @@ public void UpdateVesselAppearance(EntityUid uid, AnomalyVesselComponent? compon
+         if (_pointLight.TryGetLight(uid, out var pointLightComponent))
+             _pointLight.SetEnabled(uid, on, pointLightComponent);
+ 
+-        // arbitrary value for the generic visualizer to use.
+-        // i didn't feel like making an enum for this.
+-        var value = 1;
+-        if (TryComp<AnomalyComponent>(component.Anomaly, out var anomalyComp))
+-        {
+-            if (anomalyComp.Stability <= anomalyComp.DecayThreshold)
+-            {
+-                value = 2;
+-            }
+-            else if (anomalyComp.Stability >= anomalyComp.GrowthThreshold)
+-            {
+-                value = 3;
+-            }
+-        }
+-        Appearance.SetData(uid, AnomalyVesselVisuals.AnomalyState, value, appearanceComponent);
++        if (component.Anomaly == null || !TryGetStabilityVisual(component.Anomaly.Value, out var visual))
++            visual = AnomalyStabilityVisuals.Stable;
++
++        Appearance.SetData(uid, AnomalyVesselVisuals.AnomalySeverity, visual, appearanceComponent);
+ 
+         _ambient.SetAmbience(uid, on);
+     }
+diff --git a/Content.Server/Anomaly/AnomalySystem.cs b/Content.Server/Anomaly/AnomalySystem.cs
+index 9ac0ce7c94..69f18e5eeb 100644
+--- a/Content.Server/Anomaly/AnomalySystem.cs
++++ b/Content.Server/Anomaly/AnomalySystem.cs
+@@ -9,7 +9,6 @@
+ using Content.Shared.Anomaly;
+ using Content.Shared.Anomaly.Components;
+ using Content.Shared.Anomaly.Prototypes;
+-using Content.Shared.DoAfter;
+ using Content.Shared.Random;
+ using Content.Shared.Random.Helpers;
+ using Robust.Server.GameObjects;
+@@ -18,6 +17,7 @@
+ using Robust.Shared.Physics.Events;
+ using Robust.Shared.Prototypes;
+ using Robust.Shared.Random;
++using Robust.Shared.Utility;
+ 
+ namespace Content.Server.Anomaly;
+ 
+@@ -30,7 +30,6 @@ public sealed partial class AnomalySystem : SharedAnomalySystem
+     [Dependency] private readonly IPrototypeManager _prototype = default!;
+     [Dependency] private readonly AmbientSoundSystem _ambient = default!;
+     [Dependency] private readonly AtmosphereSystem _atmosphere = default!;
+-    [Dependency] private readonly SharedDoAfterSystem _doAfter = default!;
+     [Dependency] private readonly ExplosionSystem _explosion = default!;
+     [Dependency] private readonly MaterialStorageSystem _material = default!;
+     [Dependency] private readonly SharedPointLightSystem _pointLight = default!;
+@@ -53,10 +52,9 @@ public override void Initialize()
+         SubscribeLocalEvent<AnomalyComponent, MapInitEvent>(OnMapInit);
+         SubscribeLocalEvent<AnomalyComponent, ComponentShutdown>(OnShutdown);
+         SubscribeLocalEvent<AnomalyComponent, StartCollideEvent>(OnStartCollide);
+-
++        SubscribeLocalEvent<AnomalyStabilityChangedEvent>(OnVesselAnomalyStabilityChanged);
+ 
+         InitializeGenerator();
+-        InitializeScanner();
+         InitializeVessel();
+         InitializeCommands();
+     }
+@@ -218,4 +216,112 @@ private void RemoveBehavior(Entity<AnomalyComponent> anomaly, ProtoId<AnomalyBeh
+         EntityManager.RemoveComponents(anomaly, behavior.Components);
+     }
+     #endregion
++
++    #region Information
++    /// <summary>
++    /// Get a formatted message with a summary of all anomaly information for putting on a UI.
++    /// </summary>
++    public FormattedMessage GetScannerMessage(AnomalyScannerComponent component)
++    {
++        var msg = new FormattedMessage();
++        if (component.ScannedAnomaly is not { } anomaly || !TryComp<AnomalyComponent>(anomaly, out var anomalyComp))
++        {
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-no-anomaly"));
++            return msg;
++        }
++
++        TryComp<SecretDataAnomalyComponent>(anomaly, out var secret);
++
++        //Severity
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.Severity))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-severity-percentage-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-severity-percentage", ("percent", anomalyComp.Severity.ToString("P"))));
++        msg.PushNewline();
++
++        //Stability
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.Stability))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-stability-unknown"));
++        else
++        {
++            string stateLoc;
++            if (anomalyComp.Stability < anomalyComp.DecayThreshold)
++                stateLoc = Loc.GetString("anomaly-scanner-stability-low");
++            else if (anomalyComp.Stability > anomalyComp.GrowthThreshold)
++                stateLoc = Loc.GetString("anomaly-scanner-stability-high");
++            else
++                stateLoc = Loc.GetString("anomaly-scanner-stability-medium");
++            msg.AddMarkupOrThrow(stateLoc);
++        }
++        msg.PushNewline();
++
++        //Point output
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.OutputPoint))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-point-output-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-point-output", ("point", GetAnomalyPointValue(anomaly, anomalyComp))));
++        msg.PushNewline();
++        msg.PushNewline();
++
++        //Particles title
++        msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-readout"));
++        msg.PushNewline();
++
++        //Danger
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleDanger))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-danger-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-danger", ("type", GetParticleLocale(anomalyComp.SeverityParticleType))));
++        msg.PushNewline();
++
++        //Unstable
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleUnstable))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-unstable-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-unstable", ("type", GetParticleLocale(anomalyComp.DestabilizingParticleType))));
++        msg.PushNewline();
++
++        //Containment
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleContainment))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-containment-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-containment", ("type", GetParticleLocale(anomalyComp.WeakeningParticleType))));
++        msg.PushNewline();
++
++        //Transformation
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.ParticleTransformation))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-transformation-unknown"));
++        else
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-scanner-particle-transformation", ("type", GetParticleLocale(anomalyComp.TransformationParticleType))));
++
++
++        //Behavior
++        msg.PushNewline();
++        msg.PushNewline();
++        msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-title"));
++        msg.PushNewline();
++
++        if (secret != null && secret.Secret.Contains(AnomalySecretData.Behavior))
++            msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-unknown"));
++        else
++        {
++            if (anomalyComp.CurrentBehavior != null)
++            {
++                var behavior = _prototype.Index(anomalyComp.CurrentBehavior.Value);
++
++                msg.AddMarkupOrThrow("- " + Loc.GetString(behavior.Description));
++                msg.PushNewline();
++                var mod = Math.Floor((behavior.EarnPointModifier) * 100);
++                msg.AddMarkupOrThrow("- " + Loc.GetString("anomaly-behavior-point", ("mod", mod)));
++            }
++            else
++            {
++                msg.AddMarkupOrThrow(Loc.GetString("anomaly-behavior-balanced"));
++            }
++        }
++
++        //The timer at the end here is actually added in the ui itself.
++        return msg;
++    }
++    #endregion
+ }
+diff --git a/Content.Server/Anomaly/Effects/SecretDataAnomalySystem.cs b/Content.Server/Anomaly/Effects/SecretDataAnomalySystem.cs
+index cbdc4b04df..0515ed855e 100644
+--- a/Content.Server/Anomaly/Effects/SecretDataAnomalySystem.cs
++++ b/Content.Server/Anomaly/Effects/SecretDataAnomalySystem.cs
+@@ -36,5 +36,13 @@ public void RandomizeSecret(EntityUid uid, int count, SecretDataAnomalyComponent
+             component.Secret.Add(_random.PickAndTake(_deita));
+         }
+     }
++
++    public bool IsSecret(EntityUid uid, AnomalySecretData item, SecretDataAnomalyComponent? component = null)
++    {
++        if (!Resolve(uid, ref component, logMissing: false))
++            return false;
++
++        return component.Secret.Contains(item);
++    }
+ }
+ 
+diff --git a/Content.Server/Entry/IgnoredComponents.cs b/Content.Server/Entry/IgnoredComponents.cs
+index 58264e14ad..a34842c64f 100644
+--- a/Content.Server/Entry/IgnoredComponents.cs
++++ b/Content.Server/Entry/IgnoredComponents.cs
+@@ -20,6 +20,7 @@ public static class IgnoredComponents
+             "LightFade",
+             "HolidayRsiSwap",
+             "OptionsVisualizer",
++            "AnomalyScannerScreen",
+             "MultipartMachineGhost"
+         };
+     }
+diff --git a/Content.Server/Anomaly/Components/AnomalyScannerComponent.cs b/Content.Shared/Anomaly/Components/AnomalyScannerComponent.cs
+similarity index 78%
+rename from Content.Server/Anomaly/Components/AnomalyScannerComponent.cs
+rename to Content.Shared/Anomaly/Components/AnomalyScannerComponent.cs
+index 1bc3070494..c49743f630 100644
+--- a/Content.Server/Anomaly/Components/AnomalyScannerComponent.cs
++++ b/Content.Shared/Anomaly/Components/AnomalyScannerComponent.cs
+@@ -1,13 +1,15 @@
+ ﻿using Content.Shared.Anomaly;
+ using Robust.Shared.Audio;
++using Robust.Shared.GameStates;
+ 
+-namespace Content.Server.Anomaly.Components;
++namespace Content.Shared.Anomaly.Components;
+ 
+ /// <summary>
+ /// This is used for scanning anomalies and
+ /// displaying information about them in the ui
+ /// </summary>
+-[RegisterComponent, Access(typeof(SharedAnomalySystem))]
++[RegisterComponent, Access(typeof(SharedAnomalyScannerSystem))]
++[NetworkedComponent]
+ public sealed partial class AnomalyScannerComponent : Component
+ {
+     /// <summary>
+@@ -19,12 +21,12 @@ public sealed partial class AnomalyScannerComponent : Component
+     /// <summary>
+     /// How long the scan takes
+     /// </summary>
+-    [DataField("scanDoAfterDuration")]
++    [DataField]
+     public float ScanDoAfterDuration = 5;
+ 
+     /// <summary>
+     /// The sound plays when the scan finished
+     /// </summary>
+-    [DataField("completeSound")]
++    [DataField]
+     public SoundSpecifier? CompleteSound = new SoundPathSpecifier("/Audio/Items/beep.ogg");
+ }
+diff --git a/Content.Shared/Anomaly/SharedAnomaly.cs b/Content.Shared/Anomaly/SharedAnomaly.cs
+index cde61ca336..ac1ba042d4 100644
+--- a/Content.Shared/Anomaly/SharedAnomaly.cs
++++ b/Content.Shared/Anomaly/SharedAnomaly.cs
+@@ -17,6 +17,14 @@ public enum AnomalyVisualLayers : byte
+     Animated
+ }
+ 
++[Serializable, NetSerializable]
++public enum AnomalyStabilityVisuals : byte
++{
++    Stable = 1,
++    Decaying = 2,
++    Growing = 3,
++}
++
+ /// <summary>
+ /// The types of anomalous particles used
+ /// for interfacing with anomalies.
+@@ -41,7 +49,7 @@ public enum AnomalousParticleType : byte
+ public enum AnomalyVesselVisuals : byte
+ {
+     HasAnomaly,
+-    AnomalyState
++    AnomalySeverity,
+ }
+ 
+ [Serializable, NetSerializable]
+@@ -68,6 +76,27 @@ public enum AnomalyScannerUiKey : byte
+     Key
+ }
+ 
++[Serializable, NetSerializable]
++public enum AnomalyScannerVisuals : byte
++{
++    HasAnomaly,
++    AnomalyStability,
++    AnomalySeverity,
++    AnomalyNextPulse,
++    AnomalyIsSupercritical,
++}
++
++[Serializable, NetSerializable]
++public enum AnomalyScannerVisualLayers : byte
++{
++    Base,
++    Screen,
++    SeverityMask,
++    Stability,
++    Pulse,
++    Supercritical,
++}
++
+ [Serializable, NetSerializable]
+ public sealed class AnomalyScannerUserInterfaceState : BoundUserInterfaceState
+ {
+diff --git a/Content.Shared/Anomaly/SharedAnomalyScannerSystem.cs b/Content.Shared/Anomaly/SharedAnomalyScannerSystem.cs
+new file mode 100644
+index 0000000000..42d57c65f0
+--- /dev/null
++++ b/Content.Shared/Anomaly/SharedAnomalyScannerSystem.cs
+@@ -0,0 +1,86 @@
++using Content.Shared.Anomaly.Components;
++using Content.Shared.DoAfter;
++using Content.Shared.Interaction;
++using Content.Shared.Popups;
++using Robust.Shared.Audio.Systems;
++using Robust.Shared.Timing;
++
++namespace Content.Shared.Anomaly;
++
++/// <summary> System for controlling anomaly scanner device. </summary>
++public abstract class SharedAnomalyScannerSystem : EntitySystem
++{
++    [Dependency] protected readonly SharedPopupSystem Popup = default!;
++    [Dependency] protected readonly SharedAudioSystem Audio = default!;
++    [Dependency] protected readonly IGameTiming Timing = default!;
++    [Dependency] protected readonly SharedAppearanceSystem Appearance = default!;
++    [Dependency] private readonly SharedDoAfterSystem _doAfter = default!;
++    [Dependency] protected readonly SharedUserInterfaceSystem UI = default!;
++
++    public override void Initialize()
++    {
++        base.Initialize();
++
++        SubscribeLocalEvent<AnomalyScannerComponent, ScannerDoAfterEvent>(OnDoAfter);
++        SubscribeLocalEvent<AnomalyScannerComponent, AfterInteractEvent>(OnScannerAfterInteract);
++        SubscribeLocalEvent<AnomalyShutdownEvent>(OnScannerAnomalyShutdown);
++    }
++
++    private void OnScannerAnomalyShutdown(ref AnomalyShutdownEvent args)
++    {
++        var query = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (query.MoveNext(out var uid, out var component))
++        {
++            if (component.ScannedAnomaly != args.Anomaly)
++                continue;
++
++            UI.CloseUi(uid, AnomalyScannerUiKey.Key);
++            // Anomaly over, reset all the appearance data
++            Appearance.SetData(uid, AnomalyScannerVisuals.HasAnomaly, false);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalyIsSupercritical, false);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalyNextPulse, 0);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalySeverity, 0);
++            Appearance.SetData(uid, AnomalyScannerVisuals.AnomalyStability, AnomalyStabilityVisuals.Stable);
++        }
++    }
++
++    private void OnScannerAfterInteract(EntityUid uid, AnomalyScannerComponent component, AfterInteractEvent args)
++    {
++        if (args.Target is not { } target)
++            return;
++
++        if (!HasComp<AnomalyComponent>(target))
++            return;
++
++        if (!args.CanReach)
++            return;
++
++        var doAfterArgs = new DoAfterArgs(
++            EntityManager,
++            args.User,
++            component.ScanDoAfterDuration,
++            new ScannerDoAfterEvent(),
++            uid,
++            target: target,
++            used: uid
++        )
++        {
++            DistanceThreshold = 2f
++        };
++        _doAfter.TryStartDoAfter(doAfterArgs);
++    }
++
++    protected virtual void OnDoAfter(EntityUid uid, AnomalyScannerComponent component, DoAfterEvent args)
++    {
++        if (args.Cancelled || args.Handled || args.Args.Target == null)
++            return;
++
++        Audio.PlayPredicted(component.CompleteSound, uid, args.User);
++        Popup.PopupPredicted(Loc.GetString("anomaly-scanner-component-scan-complete"), uid, args.User);
++
++        UI.OpenUi(uid, AnomalyScannerUiKey.Key, args.User);
++
++        args.Handled = true;
++    }
++
++}
+diff --git a/Content.Shared/Anomaly/SharedAnomalySystem.cs b/Content.Shared/Anomaly/SharedAnomalySystem.cs
+index ee3903a1d9..452dc73e26 100644
+--- a/Content.Shared/Anomaly/SharedAnomalySystem.cs
++++ b/Content.Shared/Anomaly/SharedAnomalySystem.cs
+@@ -1,3 +1,4 @@
++using System.Diagnostics.CodeAnalysis;
+ using Content.Shared.Administration.Logs;
+ using Content.Shared.Anomaly.Components;
+ using Content.Shared.Anomaly.Prototypes;
+@@ -140,6 +141,7 @@ public void StartSupercriticalEvent(Entity<AnomalyComponent?> ent)
+         var super = AddComp<AnomalySupercriticalComponent>(ent);
+         super.EndTime = Timing.CurTime + ent.Comp.SupercriticalDuration;
+         Appearance.SetData(ent, AnomalyVisuals.Supercritical, true);
++        SetScannerSupercritical((ent, ent.Comp), true);
+         Dirty(ent, super);
+     }
+ 
+@@ -340,7 +342,8 @@ public override void Update(float frameTime)
+                 ChangeAnomalyHealth(ent, anomaly.HealthChangePerSecond * frameTime, anomaly);
+             }
+ 
+-            if (Timing.CurTime > anomaly.NextPulseTime)
++            var secondsUntilNextPulse = (anomaly.NextPulseTime - Timing.CurTime).TotalSeconds;
++            if (secondsUntilNextPulse < 0)
+             {
+                 DoAnomalyPulse(ent, anomaly);
+             }
+@@ -366,6 +369,18 @@ public override void Update(float frameTime)
+         }
+     }
+ 
++    private void SetScannerSupercritical(Entity<AnomalyComponent> anomalyEnt, bool value)
++    {
++        var scannerQuery = EntityQueryEnumerator<AnomalyScannerComponent>();
++        while (scannerQuery.MoveNext(out var scannerUid, out var scanner))
++        {
++            if (scanner.ScannedAnomaly != anomalyEnt)
++                continue;
++
++            Appearance.SetData(scannerUid, AnomalyScannerVisuals.AnomalyIsSupercritical, value);
++        }
++    }
++
+     /// <summary>
+     /// Gets random points around the anomaly based on the given parameters.
+     /// </summary>
+@@ -441,6 +456,33 @@ public override void Update(float frameTime)
+         }
+         return resultList;
+     }
++
++    public bool TryGetStabilityVisual(Entity<AnomalyComponent?> ent, [NotNullWhen(true)] out AnomalyStabilityVisuals? visual)
++    {
++        visual = null;
++        if (!Resolve(ent, ref ent.Comp, logMissing: false))
++            return false;
++
++        visual = AnomalyStabilityVisuals.Stable;
++        if (ent.Comp.Stability <= ent.Comp.DecayThreshold)
++        {
++            visual = AnomalyStabilityVisuals.Decaying;
++        }
++        else if (ent.Comp.Stability >= ent.Comp.GrowthThreshold)
++        {
++            visual = AnomalyStabilityVisuals.Growing;
++        }
++
++        return true;
++    }
++
++    public AnomalyStabilityVisuals GetStabilityVisualOrStable(Entity<AnomalyComponent?> ent)
++    {
++        if(TryGetStabilityVisual(ent, out var visual))
++            return visual.Value;
++
++        return AnomalyStabilityVisuals.Stable;
++    }
+ }
+ 
+ [DataRecord]
+diff --git a/Resources/Prototypes/Entities/Objects/Specific/Research/anomaly.yml b/Resources/Prototypes/Entities/Objects/Specific/Research/anomaly.yml
+index f3a82abd72..71dbed0aac 100644
+--- a/Resources/Prototypes/Entities/Objects/Specific/Research/anomaly.yml
++++ b/Resources/Prototypes/Entities/Objects/Specific/Research/anomaly.yml
+@@ -6,7 +6,26 @@
+   components:
+   - type: Sprite
+     sprite: Objects/Specific/Research/anomalyscanner.rsi
+-    state: icon
++    layers:
++      - state: icon
++        map: ["enum.AnomalyScannerVisualLayers.Base"]
++      - map: ["enum.AnomalyScannerVisualLayers.Screen"]
++        visible: false
++        shader: unshaded
++      - state: severity_mask
++        map: ["enum.AnomalyScannerVisualLayers.SeverityMask"]
++        visible: false
++        shader: unshaded
++      - map: ["enum.AnomalyScannerVisualLayers.Stability"]
++        visible: false
++        shader: unshaded
++      - visible: false
++        map: ["enum.AnomalyScannerVisualLayers.Pulse"]
++        shader: unshaded
++      - state: supercritical
++        map: ["enum.AnomalyScannerVisualLayers.Supercritical"]
++        shader: unshaded
++        visible: false
+   - type: ActivatableUI
+     key: enum.AnomalyScannerUiKey.Key
+     requireActiveHand: false
+@@ -15,7 +34,35 @@
+     interfaces:
+       enum.AnomalyScannerUiKey.Key:
+         type: AnomalyScannerBoundUserInterface
++  - type: Appearance
++  - type: GenericVisualizer
++    visuals:
++      enum.AnomalyScannerVisuals.HasAnomaly:
++        enum.AnomalyScannerVisualLayers.Screen:
++          True: { visible: true }
++          False: { visible: false }
++        enum.AnomalyScannerVisualLayers.SeverityMask:
++          True: { visible: true }
++          False: { visible: false }
++      enum.AnomalyScannerVisuals.AnomalyStability:
++        enum.AnomalyScannerVisualLayers.Stability:
++          Stable: { visible: false }
++          Decaying: { visible: true, state: decaying }
++          Growing: { visible: true, state: growing }
++      enum.AnomalyScannerVisuals.AnomalyNextPulse:
++        enum.AnomalyScannerVisualLayers.Pulse:
++          0: { visible: false }
++          1: { visible: true, state: timer_1 }
++          2: { visible: true, state: timer_2 }
++          3: { visible: true, state: timer_3 }
++          4: { visible: true, state: timer_4 }
++          5: { visible: true, state: timer_5 }
++      enum.AnomalyScannerVisuals.AnomalyIsSupercritical:
++        enum.AnomalyScannerVisualLayers.Supercritical:
++          True: { visible: true }
++          False: { visible: false }
+   - type: AnomalyScanner
++  - type: AnomalyScannerScreen
+   - type: GuideHelp
+     guides:
+     - ScannersAndVessels
+diff --git a/Resources/Prototypes/Entities/Structures/Machines/anomaly_equipment.yml b/Resources/Prototypes/Entities/Structures/Machines/anomaly_equipment.yml
+index 6ef8f7262f..064dc68c68 100644
+--- a/Resources/Prototypes/Entities/Structures/Machines/anomaly_equipment.yml
++++ b/Resources/Prototypes/Entities/Structures/Machines/anomaly_equipment.yml
+@@ -53,15 +53,15 @@
+         enum.AnomalyVesselVisualLayers.Base:
+           True: { visible: true }
+           False: { visible: false }
+-      enum.AnomalyVesselVisuals.AnomalyState:
++      enum.AnomalyVesselVisuals.AnomalySeverity:
+         enum.PowerDeviceVisualLayers.Powered:
+-          1: { state: powered-1 }
+-          2: { state: powered-2 }
+-          3: { state: powered-3 }
++          Stable: { state: powered-1 }
++          Decaying: { state: powered-2 }
++          Growing: { state: powered-3 }
+         enum.AnomalyVesselVisualLayers.Base:
+-          1: { state: anomaly-1 }
+-          2: { state: anomaly-2 }
+-          3: { state: anomaly-3 }
++          Stable: { state: anomaly-1 }
++          Decaying: { state: anomaly-2 }
++          Growing: { state: anomaly-3 }
+       enum.WiresVisuals.MaintenancePanelState:
+         enum.WiresVisualLayers.MaintenancePanel:
+           True: { visible: false }
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/decaying.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/decaying.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..7335e13cb0c0d2c733a99bcd21689d574011c3de
+GIT binary patch
+literal 603
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$TQZ%U13aCb6#|O#(=u~X
+z85lGs)=sqbIP4&EG=BdIk8Wq{4vw@Heqt`JGE2K$Hw4_`T5B~U<`=84)Fcsc_k&v>
+zJUE_o_2ALSaQ1LVfj<m|;&Vh|mmK-8+A3x!C-eRB-Mz=}S|7N*%JAq1e}=BCS2I(b
+zPKbxKKG0_RpxndZ=8~4N@=X%oy2r2O<o4Y=S~>0aPJ8zVJt>|K97l?MF8e;>eKgZI
+z`0*ZpnN-n0H9K{=>o1#*^v6t>se2r=?dECY#Z`L7{xYg!r)+h;8mxZ7_0gozCoJUD
+z_h+)xEb|M)vUsoURIg85v0`1yPQPLaPaVZp6Bdt*1zl1;M>0b_4JR!8+tOWs;@k3*
+zsuNdpx%IJLS?I9k?}PdeyQ3GIn7&kL6>@lRbd#N1;{&}5c~RHCZ%p0l&v4(kU}@Rk
+zuVMzjJ*zgaKHAsNnET+-uGOB^2cGg7{8-YtE5qAv*1aIk3j4+RS_~7T7u279xps5^
+zWp)MkSl#;!?Cl34W^TG3d++Y`+qd_pTmAjZ;5D^q`j><sj0_A6lRRA<Ln`LHy=BP7
+zWGKLTp>zA^IaSuPbJrX{6l*?Lg{Aq4Eyohh`WZ@ReOMS67!H(I&bj?{-sz|5^H@{-
+zG#^ctWu8@#SsQRF&UN1Rc<GsU?=;-`9ee8czlywMt;~WH_cJHsfAcedK||@8d1ud_
+zvrqp#x$A_)jh1yEEA}dXc)v?b<&|us<maEW{xUEyEI7`cwJ7s!a-zZ=kS0%8KbLh*
+G2~7YC=@3o;
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/growing.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/growing.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c9eeba747a681da8e605d26e8c1cfd22e93cc3a
+GIT binary patch
+literal 211
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z|iaI
+z;uumf=j|;+zGed+)_}{mzs@Pxtru&xn_J_ifaav7&ulq6S$|Ge?5<~FU|=|~(`Me+
+zoli?XZ|0t0s%VsN({lVO|FqgqALACD|FHTr`-F>iHp-8_R^As$)p5T1r}8}m1k7;%
+znzyd1?lqf8>xmU_*uUIusE;_yC#s@!t8ZVD{r$`Q3=9lzHH@jou@{f%hB1OPdAj<!
+JtaD0e0suLWPmllr
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/meta.json b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/meta.json
+index 289c6bb269..f0a877bc87 100644
+--- a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/meta.json
++++ b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/meta.json
+@@ -17,6 +17,45 @@
+     {
+       "name": "inhand-right",
+       "directions": 4
++    },
++    {
++      "name": "growing",
++      "delays": [
++        [ 0.2, 0.2, 0.2 ]
++      ]
++    },
++    {
++      "name": "decaying",
++      "delays": [
++        [ 0.2, 0.2, 0.2 ]
++      ]
++    },
++    {
++      "name": "severity_mask",
++      "delays": [
++        [ 0.25, 0.25, 0.25, 0.25 ]
++      ]
++    },
++    {
++      "name": "timer_1"
++    },
++    {
++      "name": "timer_2"
++    },
++    {
++      "name": "timer_3"
++    },
++    {
++      "name": "timer_4"
++    },
++    {
++      "name": "timer_5"
++    },
++    {
++      "name": "supercritical",
++      "delays": [
++        [ 0.125, 0.125, 0.125, 0.125 ]
++      ]
+     }
+   ]
+ }
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/severity_mask.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/severity_mask.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d0ae9a3aec38d0a62c97ed155ecb337ec712c93
+GIT binary patch
+literal 195
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z)<Vy
+z;uumf=j|;=t_B4G)(da`m2aD>&?qr2>`e9StiXDq664LeAQMb7AI!D+c>DC{@6xSv
+znA84#@c4Em>eJEJ`dJdOE3Fhv=Y{7qhL!Dn&s7hy3Zz5eVRf_eXU6s4p6#C?TW7c6
+s-Tv=YUyY~SY<Aytcs?TogTNKWKQ$VRd@4nJ3=9kmp00i_>zopr07{=oWdHyG
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/supercritical.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/supercritical.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..fedb3ba03b76fc8d8390d1b34979462ece53725a
+GIT binary patch
+literal 501
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$7>k44ofy`glX=O&z`&C3
+z=<CS9u(6-}Pa-P=0|RG)M`SSr1K(i~W;~w1B87p0L88Ppq9iy!t)x7$D3u`~F*C13
+z&(AeP!Bo#s&%FEEcS{BahHa@4o@t(*S_~Wv3=FIcQjDw&j0_A6UJMKj(oi<YH5!b}
+zU~wh}1_nb$CI$fp28JjG28PUb7O;300|X?19Lm7J0He_?WngAtn841!!oa{_U}S8-
+zxBy}*$VS!$5R;}r3}RqnU}Rtds|>QVU|?c^>M}Gi04Y#)pVzzCWb07|28Jb`E{-7;
+zac^%r@--QVumqI6{p<fqE<0$0!lka7i%<4GVNWw%s=2xhq>cAi;;++>YZcuiUsavT
+zoHgh3XWf-Ki>7_wQvQ7zuf&{nKUHTx_i!)kKd$q(tn$gfPvSQgMa?VjIQH&0NH+rm
+zgZz)i-8;9QGcvzfV>{1F?b%Q1zNo{u)=d{qeY0YXqTAcU-7-tRJ#^;V92Vs_W#i&a
+gYzzz!rmow~xKwqo@j0u%wjg6XUHx3vIVCg!0Pfw3fdBvi
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_1.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_1.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..47b483bf5dc49cd1cc0e7997d8383bd29bec0151
+GIT binary patch
+literal 149
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}jKx9jP7LeL$-HD>VDR^J
+zaSVxQO-_(tU7R4&(-dgH<#td*LH1AkL%ZFY|JlzlaxeUnbY4}&vZ+(Xms@k=L@B-w
+v_oV&*el>deDasvKoUq{10S$;|rd3P~_tnIr%v>ZvMl*Q2`njxgN@xNA+=eav
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_2.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_2.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a138747772a9bbaadae12a4ae1517ca00fd9b1f
+GIT binary patch
+literal 157
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}jKx9jP7LeL$-HD>U<mhg
+zaSVxQO-_(tU7R4&(-dgH<#td*LH1AkL%ZFY|Jjc)1}{;Z(b)L#f6{qX5zD4d8DC3(
+z&5e_|_+}{e794rKUVg=MDJ4c5E;cP*nC=By3=9i=rBw5|ML<?Cc)I$ztaD0e0svEu
+BFIfNp
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_3.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_3.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd1ebf7da4c04581de1e482408be6651fe11f13b
+GIT binary patch
+literal 158
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}jKx9jP7LeL$-HD>V2JQ^
+zaSVxQeS2x4V1t1G>qS|v<fNCXTNhkn6q!_KAn`@f;KqbA3EzI&Z-3-4No8g16c>h#
+z=Tz%BE8KHV-xD>gm7L15^V^)aJSV<(GFYrD_VH}KU+*x<<O=Vm^HNi4I#>Q=U|?YI
+MboFyt=akR{02XgKGXMYp
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_4.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_4.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3c79e9ab29bff7b630d91efcd92d9c3f71e0937
+GIT binary patch
+literal 158
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}jKx9jP7LeL$-HD>V2JQ^
+zaSVxQO-_(tU7R4&(-dgH<#td*LH1AkL%ZFY|6k_)o?_DR)SznPbD=JogD$Ju=0x)F
+z1YgqFILV3qfD9w^`u%karbTzKebA7YU;@@F!MeEN76XIs7b%|8|CB+tGkCiCxvX<a
+GXaWE~)iZJc
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_5.png b/Resources/Textures/Objects/Specific/Research/anomalyscanner.rsi/timer_5.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..943f391907c21e9bda74d11e82bb4a543fd00d63
+GIT binary patch
+literal 160
+zcmeAS@N?(olHy`uVBq!ia0y~yU{C;I4mJh`hT^KKFANL}jKx9jP7LeL$-HD>V2JW`
+zaSVxQO-_(tU7R4&(-dgH<#td*LH1AkL%ZFY|Jjc)3NLdoU}ir2|L8n#jUpD|ol@LI
+z8XKoMv5P!0Fz}hdl(_%juSP39MaBco^$RW?(14i3w2F!0k)l*WR>RE*1_lNOPgg&e
+IbxsLQ0LuX}$^ZZW
+
+literal 0
+HcmV?d00001
+
