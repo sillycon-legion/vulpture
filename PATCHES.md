@@ -1,20 +1,5 @@
 # Included patches
 
-By ScarKy0, MilonPL, beck-thompson in [#37539](https://github.com/space-wizards/space-station-14/pull/37539):
-- add: The vulpkanin species can now be selected as a roundstart species.
-
-By B_Kirill in [#39684](https://github.com/space-wizards/space-station-14/pull/39684):
-- add: Added camera map. Cutting MAP wire hides camera from map while keeping it accessible in camera list.
-
-By Rinary in [#39790](https://github.com/space-wizards/space-station-14/pull/39790):
-- add: Added mass drivers!
-
-By ruddygreat in [#38216](https://github.com/space-wizards/space-station-14/pull/38216):
-- add: Added organisational capabilities to the cargo bounty computer.
-
-By Alkheemist in [#39701](https://github.com/space-wizards/space-station-14/pull/39701):
-- add: Added stencil lettering decals to the spraypainter.
-
 By Errant in [#31653](https://github.com/space-wizards/space-station-14/pull/31653):
 - add: The AI Eye can now teleport to any location on the station by Alt-Clicking on the Crew Monitor map.
 
@@ -34,8 +19,17 @@ By Quantum-cross in [#36493](https://github.com/space-wizards/space-station-14/p
 - add: You can drag and drop the icons in the lobby to change your job priorities!
 - tweak: Better user feedback (clear tooltips) for the "Ready/Not Ready" button.
 
+By ScarKy0, MilonPL, beck-thompson in [#37539](https://github.com/space-wizards/space-station-14/pull/37539):
+- add: The vulpkanin species can now be selected as a roundstart species.
+
+By Quantum-cross in [#37585](https://github.com/space-wizards/space-station-14/pull/37585):
+- add: The anomaly scanner has received an upgrade, showing some information without opening the UI.
+
 By _miket, RedBookcase in [#38159](https://github.com/space-wizards/space-station-14/pull/38159):
 - add: Added new Derelict Cyborg ghost roles, including the Derelict Engineer, Janitor, Salvage, Medical, and Assault Cyborg!
+
+By ruddygreat in [#38216](https://github.com/space-wizards/space-station-14/pull/38216):
+- add: Added organisational capabilities to the cargo bounty computer.
 
 By yagwog in [#38704](https://github.com/space-wizards/space-station-14/pull/38704):
 - add: Paper documents now support [form] tags for fillable text fields
@@ -43,5 +37,8 @@ By yagwog in [#38704](https://github.com/space-wizards/space-station-14/pull/387
 - add: Multiple form fields and signatures can be used in a single document
 - add: [check] to create check boxes on paperwork that can be used to tick, cross or leave blank.
 
-By Quantum-cross in [#37585](https://github.com/space-wizards/space-station-14/pull/37585):
-- add: The anomaly scanner has received an upgrade, showing some information without opening the UI.
+By B_Kirill in [#39684](https://github.com/space-wizards/space-station-14/pull/39684):
+- add: Added camera map. Cutting MAP wire hides camera from map while keeping it accessible in camera list.
+
+By Rinary in [#39790](https://github.com/space-wizards/space-station-14/pull/39790):
+- add: Added mass drivers!
