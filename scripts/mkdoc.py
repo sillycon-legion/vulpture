@@ -2,7 +2,7 @@ import glob
 import json
 
 print("# Included patches")
-for patch in glob.glob("patches/*.json"):
+for patch in sorted(glob.glob("patches/*.json")):
     patchid = patch[8:-5]
     with open(patch) as f:
         patchmeta = json.load(f)
