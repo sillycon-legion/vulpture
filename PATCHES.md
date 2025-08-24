@@ -25,9 +25,6 @@ By ScarKy0, MilonPL, beck-thompson in [#37539](https://github.com/space-wizards/
 By Quantum-cross in [#37585](https://github.com/space-wizards/space-station-14/pull/37585):
 - add: The anomaly scanner has received an upgrade, showing some information without opening the UI.
 
-By _miket, RedBookcase in [#38159](https://github.com/space-wizards/space-station-14/pull/38159):
-- add: Added new Derelict Cyborg ghost roles, including the Derelict Engineer, Janitor, Salvage, Medical, and Assault Cyborg!
-
 By ruddygreat in [#38216](https://github.com/space-wizards/space-station-14/pull/38216):
 - add: Added organisational capabilities to the cargo bounty computer.
 
