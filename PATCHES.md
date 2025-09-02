@@ -3,6 +3,9 @@
 By Errant in [#31653](https://github.com/space-wizards/space-station-14/pull/31653):
 - add: The AI Eye can now teleport to any location on the station by Alt-Clicking on the Crew Monitor map.
 
+By VlaDOS1408 in [#34052](https://github.com/space-wizards/space-station-14/pull/34052):
+- tweak: Cargo console UI reworked!
+
 By Quantum-cross in [#36493](https://github.com/space-wizards/space-station-14/pull/36493):
 - add: Job priorities are now bound to your player
 - tweak: Job preferences on characters are "yes" or "no" like antag selection

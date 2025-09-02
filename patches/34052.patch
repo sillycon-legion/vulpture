@@ -1,0 +1,723 @@
+diff --git a/Content.Client/Cargo/BUI/CargoOrderConsoleBoundUserInterface.cs b/Content.Client/Cargo/BUI/CargoOrderConsoleBoundUserInterface.cs
+index 3bd220bfad..9754198c46 100644
+--- a/Content.Client/Cargo/BUI/CargoOrderConsoleBoundUserInterface.cs
++++ b/Content.Client/Cargo/BUI/CargoOrderConsoleBoundUserInterface.cs
+@@ -72,7 +72,7 @@ protected override void Open()
+ 
+             _menu.OnItemSelected += (args) =>
+             {
+-                if (args.Button.Parent is not CargoProductRow row)
++                if (args.Button.Parent?.Parent is not CargoProductRow row)
+                     return;
+ 
+                 description.Clear();
+@@ -177,7 +177,7 @@ private bool AddOrder()
+ 
+         private void RemoveOrder(ButtonEventArgs args)
+         {
+-            if (args.Button.Parent?.Parent is not CargoOrderRow row || row.Order == null)
++            if (args.Button.Parent?.Parent?.Parent is not CargoOrderRow row || row.Order == null)
+                 return;
+ 
+             SendMessage(new CargoConsoleRemoveOrderMessage(row.Order.OrderId));
+@@ -185,7 +185,7 @@ private void RemoveOrder(ButtonEventArgs args)
+ 
+         private void ApproveOrder(ButtonEventArgs args)
+         {
+-            if (args.Button.Parent?.Parent is not CargoOrderRow row || row.Order == null)
++            if (args.Button.Parent?.Parent?.Parent is not CargoOrderRow row || row.Order == null)
+                 return;
+ 
+             if (OrderCount >= OrderCapacity)
+diff --git a/Content.Client/Cargo/UI/CargoConsoleMenu.xaml b/Content.Client/Cargo/UI/CargoConsoleMenu.xaml
+index 940352dc48..3ecfad94aa 100644
+--- a/Content.Client/Cargo/UI/CargoConsoleMenu.xaml
++++ b/Content.Client/Cargo/UI/CargoConsoleMenu.xaml
+@@ -1,86 +1,226 @@
+-﻿<controls:FancyWindow xmlns="https://spacestation14.io"
+-                           xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client"
+-                           xmlns:controls="clr-namespace:Content.Client.UserInterface.Controls"
+-                           SetSize="600 600"
+-                           MinSize="600 600">
+-    <BoxContainer Orientation="Vertical" Margin="15 5 15 10">
+-        <BoxContainer Orientation="Horizontal">
+-            <Label Text="{Loc 'cargo-console-menu-account-name-label'}"
+-                   StyleClasses="LabelKeyText" />
+-            <RichTextLabel Name="AccountNameLabel"
+-                   Text="{Loc 'cargo-console-menu-account-name-none-text'}" />
+-        </BoxContainer>
+-        <BoxContainer Orientation="Horizontal">
+-            <Label Text="{Loc 'cargo-console-menu-points-label'}"
+-                   StyleClasses="LabelKeyText" />
+-            <RichTextLabel Name="PointsLabel"
+-                   Text="$0" />
+-        </BoxContainer>
+-        <Control MinHeight="10"/>
++﻿<controls:FancyWindow
++    xmlns="https://spacestation14.io"
++    xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client"
++    xmlns:controls="clr-namespace:Content.Client.UserInterface.Controls"
++    MinSize="540 390"
++    SetSize="995 600">
++
++    <!-- Main Container -->
++    <BoxContainer Orientation="Vertical"
++        VerticalExpand="True">
++
+         <TabContainer Name="TabContainer" VerticalExpand="True">
+-            <BoxContainer Orientation="Vertical" VerticalExpand="True">
+-                <BoxContainer Orientation="Horizontal">
+-                    <OptionButton Name="Categories"
+-                                  Prefix="{Loc 'cargo-console-menu-categories-label'}"
+-                                  HorizontalExpand="True" />
+-                    <LineEdit Name="SearchBar"
+-                              PlaceHolder="{Loc 'cargo-console-menu-search-bar-placeholder'}"
+-                              HorizontalExpand="True" />
+-                </BoxContainer>
+-                <Control MinHeight="5"/>
+-                <ScrollContainer HorizontalExpand="True"
+-                                 VerticalExpand="True"
+-                                 SizeFlagsStretchRatio="2">
+-                    <BoxContainer Name="Products"
+-                                  Orientation="Vertical"
+-                                  HorizontalExpand="True"
+-                                  VerticalExpand="True">
+-                        <!-- Products get added here by code -->
+-                    </BoxContainer>
+-                </ScrollContainer>
+-                <Control MinHeight="5" Name="OrdersSpacer"/>
+-                <PanelContainer VerticalExpand="True"
+-                                SizeFlagsStretchRatio="1"
+-                                Name="Orders">
+-                    <PanelContainer.PanelOverride>
+-                        <gfx:StyleBoxFlat BackgroundColor="#000000" />
+-                    </PanelContainer.PanelOverride>
+-                    <ScrollContainer VerticalExpand="True">
+-                        <BoxContainer Orientation="Vertical" Margin="5">
+-                            <Label Text="{Loc 'cargo-console-menu-requests-label'}" />
+-                            <BoxContainer Name="Requests"
+-                                          Orientation="Vertical"
+-                                          VerticalExpand="True">
+-                                <!-- Requests are added here by code -->
+-                            </BoxContainer>
+-                        </BoxContainer>
+-                    </ScrollContainer>
+-                </PanelContainer>
+-            </BoxContainer>
+-            <!-- Funds tab -->
+-            <BoxContainer Orientation="Vertical" Margin="15">
+-                <BoxContainer Orientation="Horizontal">
+-                    <RichTextLabel Name="TransferLimitLabel" Margin="0 0 15 0"/>
+-                    <RichTextLabel Name="UnlimitedNotifier" Text="{Loc 'cargo-console-menu-account-action-transfer-limit-unlimited-notifier'}"/>
+-                </BoxContainer>
+-                <BoxContainer Orientation="Horizontal">
+-                    <RichTextLabel Text="{Loc 'cargo-console-menu-account-action-select'}" Margin="0 0 10 0"/>
+-                    <OptionButton Name="ActionOptions"/>
+-                </BoxContainer>
+-                <Control MinHeight="5"/>
+-                <BoxContainer Orientation="Horizontal">
+-                    <RichTextLabel Name="AmountText" Text="{ Loc 'cargo-console-menu-account-action-amount'}"/>
+-                    <SpinBox Name="TransferSpinBox" MinWidth="100" Value="10"/>
+-                </BoxContainer>
+-                <Control MinHeight="15"/>
+-                <BoxContainer HorizontalAlignment="Center">
+-                    <Button Name="AccountActionButton" Text="{ Loc 'cargo-console-menu-account-action-button'}" MinHeight="45" MinWidth="120"/>
+-                </BoxContainer>
+-                <Control VerticalExpand="True"/>
+-                <BoxContainer VerticalAlignment="Bottom" HorizontalAlignment="Center">
+-                    <Button Name="AccountLimitToggleButton" Text="{ Loc 'cargo-console-menu-toggle-account-lock-button'}" MinHeight="45" MinWidth="120"/>
+-                </BoxContainer>
+-            </BoxContainer>
++          <!-- Sub-Main Container -->
++          <BoxContainer Orientation="Horizontal"
++              VerticalExpand="True"
++              Margin="8 4 8 6">
++
++              <!-- Left Part -->
++              <BoxContainer Orientation="Vertical"
++                  SeparationOverride="4"
++                  Margin="0 0 8 0"
++                  HorizontalExpand="True">
++
++                  <!-- Info -->
++                  <BoxContainer Orientation="Vertical">
++                      <GridContainer Columns="3">
++
++                          <!-- Account -->
++                          <Label Text="{Loc 'cargo-console-menu-account-name-label'}"
++                              StyleClasses="LabelKeyText" />
++
++                          <PanelContainer StyleClasses="LowDivider" Margin="0 -2"/>
++
++                          <RichTextLabel Name="AccountNameLabel"
++                              Text="{Loc 'cargo-console-menu-account-name-none-text'}"
++                              Margin="4 0"/>
++
++                          <!-- Balance -->
++                          <Label Text="{Loc 'cargo-console-menu-points-label'}"
++                              StyleClasses="LabelKeyText"/>
++
++                          <PanelContainer StyleClasses="LowDivider" Margin="0 -2"/>
++
++                          <RichTextLabel Name="PointsLabel"
++                              Text="$0"
++                              Margin="4 0" />
++
++                          <!-- Orders Count/Capacity -->
++                          <Label Text="{Loc 'cargo-console-menu-order-capacity-label'}"
++                              StyleClasses="LabelKeyText" />
++
++                          <PanelContainer StyleClasses="LowDivider" Margin="0 -2 0 -1"/>
++
++                          <Label Name="ShuttleCapacityLabel"
++                              Text="0/20"
++                              Margin="4 0"/>
++                      </GridContainer>
++
++                      <PanelContainer StyleClasses="LowDivider" Margin="0 4.5 -8 0"/>
++                  </BoxContainer>
++
++                  <!-- Search -->
++                  <BoxContainer Orientation="Horizontal"
++                      Margin="0 2 0 0">
++
++                      <LineEdit Name="SearchBar"
++                          PlaceHolder="{Loc 'cargo-console-menu-search-bar-placeholder'}"
++                          HorizontalExpand="True" />
++
++                      <OptionButton Name="Categories"
++                          Prefix="{Loc 'cargo-console-menu-categories-label'}"
++                          StyleClasses="OpenLeft"/>
++                  </BoxContainer>
++
++                  <!-- Product list -->
++                  <ScrollContainer
++                      HorizontalExpand="False"
++                      VerticalExpand="True"
++                      HScrollEnabled="False">
++
++                      <BoxContainer Name="Products"
++                          Orientation="Vertical"
++                          HorizontalExpand="True"
++                          VerticalExpand="True">
++
++                          <!-- Products get added here by code -->
++                      </BoxContainer>
++                  </ScrollContainer>
++              </BoxContainer>
++
++              <PanelContainer StyleClasses="LowDivider" Margin="0 -8"/>
++
++              <!-- Right Part -->
++              <BoxContainer Orientation="Vertical"
++                  SizeFlagsStretchRatio="0.8"
++                  HorizontalExpand="True"
++                  Name="RightPart">
++
++                  <!-- Requests Part -->
++                  <BoxContainer Orientation="Vertical"
++                      VerticalExpand="True"
++                      SizeFlagsStretchRatio="2">
++
++                      <!-- Title -->
++                      <controls:StripeBack>
++                          <Label Text="{Loc 'cargo-console-menu-requests-label'}"
++                              HorizontalAlignment="Center"
++                              Margin="4"/>
++                      </controls:StripeBack>
++
++                      <PanelContainer VerticalExpand="True"
++                          Margin="0 -4 0 0">
++
++                          <!-- Background -->
++                          <PanelContainer.PanelOverride>
++                              <gfx:StyleBoxFlat BackgroundColor="#040404" />
++                          </PanelContainer.PanelOverride>
++
++                          <BoxContainer Orientation="Vertical">
++                              <ScrollContainer VerticalExpand="True">
++                                  <BoxContainer Name="Requests"
++                                      Orientation="Vertical"
++                                      StyleClasses="transparentItemList"
++                                      VerticalExpand="True"
++                                      SeparationOverride="8"
++                                      Margin="8">
++
++                                      <!-- Requests are added here by code -->
++                                  </BoxContainer>
++                              </ScrollContainer>
++                          </BoxContainer>
++                      </PanelContainer>
++                  </BoxContainer>
++
++                  <!-- Orders Part -->
++                  <BoxContainer Orientation="Vertical"
++                      VerticalExpand="True">
++
++                      <!-- Title -->
++                      <controls:StripeBack>
++                          <Label Text="{Loc 'cargo-console-menu-orders-label'}"
++                              HorizontalAlignment="Center"
++                              Margin="4"/>
++                      </controls:StripeBack>
++
++                      <PanelContainer VerticalExpand="True"
++                          Margin="0 -4 0 0">
++
++                          <!-- Background -->
++                          <PanelContainer.PanelOverride>
++                              <gfx:StyleBoxFlat BackgroundColor="#040404" />
++                          </PanelContainer.PanelOverride>
++
++                          <BoxContainer Orientation="Vertical"
++                              Margin="6">
++                              <ScrollContainer VerticalExpand="True">
++                                  <BoxContainer Orientation="Vertical"
++                                      StyleClasses="transparentItemList"
++                                      VerticalExpand="True"
++                                      SeparationOverride="6">
++
++                                      <!-- Orders are added here by code -->
++                                  </BoxContainer>
++                              </ScrollContainer>
++                          </BoxContainer>
++                      </PanelContainer>
++                  </BoxContainer>
++              </BoxContainer>
++          </BoxContainer>
++          <!-- Funds tab -->
++          <BoxContainer Orientation="Vertical" Margin="15">
++              <BoxContainer Orientation="Horizontal">
++                  <RichTextLabel Name="TransferLimitLabel" Margin="0 0 15 0"/>
++                  <RichTextLabel Name="UnlimitedNotifier" Text="{Loc 'cargo-console-menu-account-action-transfer-limit-unlimited-notifier'}"/>
++              </BoxContainer>
++              <BoxContainer Orientation="Horizontal">
++                  <RichTextLabel Text="{Loc 'cargo-console-menu-account-action-select'}" Margin="0 0 10 0"/>
++                  <OptionButton Name="ActionOptions"/>
++              </BoxContainer>
++              <Control MinHeight="5"/>
++              <BoxContainer Orientation="Horizontal">
++                  <RichTextLabel Name="AmountText" Text="{ Loc 'cargo-console-menu-account-action-amount'}"/>
++                  <SpinBox Name="TransferSpinBox" MinWidth="100" Value="10"/>
++              </BoxContainer>
++              <Control MinHeight="15"/>
++              <BoxContainer HorizontalAlignment="Center">
++                  <Button Name="AccountActionButton" Text="{ Loc 'cargo-console-menu-account-action-button'}" MinHeight="45" MinWidth="120"/>
++              </BoxContainer>
++              <Control VerticalExpand="True"/>
++              <BoxContainer VerticalAlignment="Bottom" HorizontalAlignment="Center">
++                  <Button Name="AccountLimitToggleButton" Text="{ Loc 'cargo-console-menu-toggle-account-lock-button'}" MinHeight="45" MinWidth="120"/>
++              </BoxContainer>
++          </BoxContainer>
+         </TabContainer>
++
++        <!-- Footer -->
++        <!-- TODO: Create customControls element -->
++        <BoxContainer Orientation="Vertical"
++            VerticalAlignment="Bottom">
++
++            <PanelContainer StyleClasses="LowDivider" />
++
++            <BoxContainer Orientation="Horizontal"
++                Margin="12 0 6 2"
++                VerticalAlignment="Bottom">
++
++                <!-- Footer title -->
++                <Label Text="{Loc 'cargo-console-menu-flavor-left'}"
++                    StyleClasses="WindowFooterText" />
++
++                <!-- Version -->
++                <Label Text="{Loc 'cargo-console-menu-flavor-right'}"
++                    StyleClasses="WindowFooterText"
++                    HorizontalAlignment="Right"
++                    HorizontalExpand="True"
++                    Margin="0 0 4 0" />
++
++                <TextureRect StyleClasses="NTLogoDark"
++                    Stretch="KeepAspectCentered"
++                    VerticalAlignment="Center"
++                    HorizontalAlignment="Right"
++                    SetSize="19 19"/>
++            </BoxContainer>
++        </BoxContainer>
+     </BoxContainer>
+ </controls:FancyWindow>
+diff --git a/Content.Client/Cargo/UI/CargoConsoleMenu.xaml.cs b/Content.Client/Cargo/UI/CargoConsoleMenu.xaml.cs
+index 03246cfdfe..67e9e903a2 100644
+--- a/Content.Client/Cargo/UI/CargoConsoleMenu.xaml.cs
++++ b/Content.Client/Cargo/UI/CargoConsoleMenu.xaml.cs
+@@ -6,6 +6,7 @@
+ using Content.Shared.Cargo.Prototypes;
+ using Robust.Client.AutoGenerated;
+ using Robust.Client.GameObjects;
++using Robust.Client.Graphics;
+ using Robust.Client.UserInterface.Controls;
+ using Robust.Client.UserInterface.XAML;
+ using Robust.Shared.Prototypes;
+@@ -215,28 +216,56 @@ public void PopulateOrders(IEnumerable<CargoOrderData> orders)
+ 
+                 var product = _protoManager.Index<EntityPrototype>(order.ProductId);
+                 var productName = product.Name;
++                var requester = !string.IsNullOrEmpty(order.Requester) ?
++                    order.Requester : Loc.GetString("cargo-console-menu-order-row-alerts-requester-unknown");
+                 var account = _protoManager.Index(order.Account);
+ 
+                 var row = new CargoOrderRow
+                 {
+                     Order = order,
++
++                    Title =
++                    {
++                        Text = Loc.GetString(
++                            "cargo-console-menu-order-row-title",
++                            ("productName", productName),
++                            ("orderAmount", order.OrderQuantity),
++                            ("orderPrice", order.Price)),
++                    },
++
++                    Stride =
++                    {
++                        PanelOverride = new StyleBoxFlat
++                        {
++                            BackgroundColor = account.Color,
++                            ContentMarginBottomOverride = 2,
++                        },
++                    },
++
+                     Icon = { Texture = _spriteSystem.Frame0(product) },
++
+                     ProductName =
+                     {
+                         Text = Loc.GetString(
+                             "cargo-console-menu-populate-orders-cargo-order-row-product-name-text",
+-                            ("productName", productName),
+-                            ("orderAmount", order.OrderQuantity),
+-                            ("orderRequester", order.Requester),
++                            ("orderRequester", requester),
+                             ("accountColor", account.Color),
+                             ("account", Loc.GetString(account.Code)))
+                     },
++
+                     Description =
+                     {
+-                        Text = Loc.GetString("cargo-console-menu-order-reason-description",
+-                                                        ("reason", order.Reason))
++                        Text = !string.IsNullOrEmpty(order.Reason) ?
++                            Loc.GetString(
++                                "cargo-console-menu-order-row-product-description",
++                                ("orderReason", order.Reason))
++                        :
++                            Loc.GetString(
++                                "cargo-console-menu-order-row-product-description",
++                                ("orderReason", Loc.GetString("cargo-console-menu-order-row-alerts-reason-absent")))
+                     }
+                 };
++
+                 row.Cancel.OnPressed += (args) => { OnOrderCanceled?.Invoke(args); };
+ 
+                 // TODO: Disable based on access.
+@@ -294,8 +323,7 @@ protected override void FrameUpdate(FrameEventArgs args)
+                                            TransferSpinBox.Value > bankAccount.Accounts[orderConsole.Account] * orderConsole.TransferLimit ||
+                                            _timing.CurTime < orderConsole.NextAccountActionTime;
+ 
+-            OrdersSpacer.Visible = orderConsole.Mode != CargoOrderConsoleMode.PrintSlip;
+-            Orders.Visible = orderConsole.Mode != CargoOrderConsoleMode.PrintSlip;
++            RightPart.Visible = orderConsole.Mode != CargoOrderConsoleMode.PrintSlip;
+         }
+     }
+ }
+diff --git a/Content.Client/Cargo/UI/CargoConsoleOrderMenu.xaml b/Content.Client/Cargo/UI/CargoConsoleOrderMenu.xaml
+index 0a8f024a58..638fbd6995 100644
+--- a/Content.Client/Cargo/UI/CargoConsoleOrderMenu.xaml
++++ b/Content.Client/Cargo/UI/CargoConsoleOrderMenu.xaml
+@@ -1,33 +1,53 @@
+-﻿<DefaultWindow xmlns="https://spacestation14.io"
+-            Title="{Loc 'cargo-console-order-menu-title'}">
++<DefaultWindow xmlns="https://spacestation14.io"
++               Title="{Loc 'cargo-console-order-menu-title'}"
++               MinSize="460 261">
+     <BoxContainer Orientation="Vertical">
+         <GridContainer Columns="2">
+-            <Label Text="{Loc 'cargo-console-order-menu-product-label'}" />
++            <Label Text="{Loc 'cargo-console-order-menu-product-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <Label Name="ProductName"
+-                      Access="Public" />
+-            <Label Text="{Loc 'cargo-console-order-menu-description-label'}" />
++                   Access="Public" />
++
++            <Label Text="{Loc 'cargo-console-order-menu-description-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <RichTextLabel Name="Description"
+-                        Access="Public"
+-                        VerticalExpand="True"
+-                        SetWidth="350"/>
+-            <Label Text="{Loc 'cargo-console-order-menu-cost-label'}" />
++                           Access="Public"
++                           HorizontalExpand="True"
++                           MaxWidth="460" />
++
++            <Label Text="{Loc 'cargo-console-order-menu-cost-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <Label Name="PointCost"
+-                      Access="Public" />
+-            <Label Text="{Loc 'cargo-console-order-menu-requester-label'}" />
++                   Access="Public" />
++
++            <Label Text="{Loc 'cargo-console-order-menu-requester-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <LineEdit Name="Requester"
+                       Access="Public" />
+-            <Label Text="{Loc 'cargo-console-order-menu-reason-label'}" />
++
++            <Label Text="{Loc 'cargo-console-order-menu-reason-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <LineEdit Name="Reason"
+                       Access="Public" />
+-            <Label Text="{Loc 'cargo-console-order-menu-amount-label'}" />
++
++            <Label Text="{Loc 'cargo-console-order-menu-amount-label'}"
++                   StyleClasses="LabelKeyText" />
++
+             <SpinBox Name="Amount"
+                      Access="Public"
+                      HorizontalExpand="True"
+                      Value="1" />
+         </GridContainer>
++        <Control VerticalExpand="True"/>
++        <PanelContainer StyleClasses="LowDivider" Margin="0 6 0 2"/>
+         <Button Name="SubmitButton"
+                 Access="Public"
+                 Text="{Loc 'cargo-console-order-menu-submit-button'}"
+-                TextAlign="Center" />
++                VerticalAlignment="Bottom" />
+     </BoxContainer>
+ </DefaultWindow>
+diff --git a/Content.Client/Cargo/UI/CargoOrderRow.xaml b/Content.Client/Cargo/UI/CargoOrderRow.xaml
+index e4ec95d981..2ef27b4585 100644
+--- a/Content.Client/Cargo/UI/CargoOrderRow.xaml
++++ b/Content.Client/Cargo/UI/CargoOrderRow.xaml
+@@ -1,33 +1,79 @@
+-﻿<PanelContainer xmlns="https://spacestation14.io"
+-                HorizontalExpand="True"
+-                Margin="0 1">
+-    <BoxContainer Orientation="Horizontal"
+-                  HorizontalExpand="True">
+-        <TextureRect Name="Icon"
+-                     Access="Public"
+-                     MinSize="32 32"
+-                     RectClipContent="True" />
+-        <Control MinWidth="5"/>
+-        <BoxContainer Orientation="Vertical"
+-                      HorizontalExpand="True"
+-                      VerticalExpand="True">
+-            <RichTextLabel Name="ProductName"
+-                   Access="Public"
+-                   HorizontalExpand="True"
+-                   StyleClasses="LabelSubText" />
+-            <Label Name="Description"
+-                   Access="Public"
+-                   HorizontalExpand="True"
+-                   StyleClasses="LabelSubText"
+-                   ClipText="True" />
++<PanelContainer
++    xmlns="https://spacestation14.io"
++    xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client"
++    HorizontalExpand="True"
++    Margin="0 1"
++    StyleClasses="AngleRect">
++
++    <!-- Main Container -->
++    <BoxContainer Orientation="Vertical"
++                  HorizontalExpand="True"
++                  SeparationOverride="6"
++                  Margin="-4">
++
++        <Control Margin="-6">
++            <PanelContainer StyleClasses="WindowHeadingBackground" />
++
++            <BoxContainer Margin="6 2">
++                <Label Name="Title"
++                       Access="Public"
++                       MaxHeight="28"
++                       StyleClasses="LabelKeyText"/>
++            </BoxContainer>
++        </Control>
++
++        <PanelContainer Name="Stride"
++                        Access="Public"
++                        StyleClasses="LowDivider"
++                        Margin="-6 0" />
++
++        <!-- Info -->
++        <BoxContainer>
++            <TextureRect Name="Icon"
++                         Access="Public"
++                         MinSize="32 32"
++                         Margin="4"
++                         Stretch="KeepAspectCentered"
++                         RectClipContent="True"
++                         VerticalAlignment="Center"/>
++
++            <PanelContainer StyleClasses="LowDivider" Margin="4 0"/>
++
++            <BoxContainer Orientation="Vertical"
++                          HorizontalExpand="True"
++                          VerticalExpand="True">
++
++                <RichTextLabel Name="ProductName"
++                       Access="Public"
++                       HorizontalExpand="True"
++                       VerticalExpand="True"
++                       StyleClasses="LabelSubText" />
++
++                <Label Name="Description"
++                       Access="Public"
++                       HorizontalExpand="True"
++                       VerticalExpand="True"
++                       StyleClasses="LabelSubText"
++                       ClipText="True" />
++            </BoxContainer>
++        </BoxContainer>
++
++        <PanelContainer StyleClasses="LowDivider" Margin="-6 0"/>
++
++        <!-- Buttons -->
++        <!-- Btn's position hardcoded (args.Button.Parent?.Parent?.Parent type) in CargoConsoleBUI 158 & 166 line -->
++        <BoxContainer>
++            <Button Name="Approve"
++                    Access="Public"
++                    Text="{Loc 'cargo-console-menu-order-row-button-approve'}"
++                    StyleClasses="OpenRight"
++                    HorizontalExpand="True"/>
++
++            <Button Name="Cancel"
++                    Access="Public"
++                    Text="{Loc 'cargo-console-menu-order-row-button-cancel'}"
++                    StyleClasses="OpenLeft"
++                    HorizontalExpand="True" />
+         </BoxContainer>
+-        <Button Name="Approve"
+-                Access="Public"
+-                Text="{Loc 'cargo-console-menu-cargo-order-row-approve-button'}"
+-                StyleClasses="OpenRight" />
+-        <Button Name="Cancel"
+-                Access="Public"
+-                Text="{Loc 'cargo-console-menu-cargo-order-row-cancel-button'}"
+-                StyleClasses="OpenLeft" />
+     </BoxContainer>
+ </PanelContainer>
+diff --git a/Content.Client/Cargo/UI/CargoProductRow.xaml b/Content.Client/Cargo/UI/CargoProductRow.xaml
+index 4ae7a76e1d..e7b91c4a33 100644
+--- a/Content.Client/Cargo/UI/CargoProductRow.xaml
++++ b/Content.Client/Cargo/UI/CargoProductRow.xaml
+@@ -1,26 +1,34 @@
+-﻿<PanelContainer xmlns="https://spacestation14.io"
+-                HorizontalExpand="True">
+-    <Button Name="MainButton"
+-            ToolTip=""
+-            Access="Public"
+-            HorizontalExpand="True"
+-            VerticalExpand="True"
+-            StyleClasses="OpenBoth"/>
+-    <BoxContainer Orientation="Horizontal"
+-                  HorizontalExpand="True">
+-        <TextureRect Name="Icon"
+-                     Access="Public"
+-                     MinSize="32 32"
+-                     RectClipContent="True" />
+-        <Label Name="ProductName"
+-               Access="Public"
+-               HorizontalExpand="True" />
+-        <PanelContainer StyleClasses="BackgroundDark">
+-            <Label Name="PointCost"
++<BoxContainer xmlns="https://spacestation14.io"
++    HorizontalExpand="True">
++    <PanelContainer HorizontalExpand="True">
++        <!-- Btn position hardcoded (args.Button.Parent?.Parent type) in CargoConsoleBUI 71 line -->
++        <Button Name="MainButton"
++                ToolTip=""
++                Access="Public"
++                VerticalExpand="False"
++                StyleClasses="OpenBoth" />
++
++        <!-- Icon & Name -->
++        <BoxContainer Orientation="Horizontal"
++                      HorizontalExpand="True"
++                      Margin="4 0">
++
++            <TextureRect Name="Icon"
++                         Access="Public"
++                         MinSize="32 32"
++                         RectClipContent="True" />
++
++            <Label Name="ProductName"
+                    Access="Public"
+-                   MinSize="52 32"
+-                   Align="Right"
+-                   Margin="0 0 5 0"/>
+-        </PanelContainer>
+-    </BoxContainer>
+-</PanelContainer>
++                   HorizontalExpand="True"
++                   ClipText="True" />
++        </BoxContainer>
++    </PanelContainer>
++
++    <Label Name="PointCost"
++           Access="Public"
++           MinSize="56 32"
++           Align="Right"
++           Margin="0 0 5 0"
++           HorizontalAlignment="Right"/>
++</BoxContainer>
+diff --git a/Content.Client/Cargo/UI/CargoProductRow.xaml.cs b/Content.Client/Cargo/UI/CargoProductRow.xaml.cs
+index 5afa7633a5..1c7f791604 100644
+--- a/Content.Client/Cargo/UI/CargoProductRow.xaml.cs
++++ b/Content.Client/Cargo/UI/CargoProductRow.xaml.cs
+@@ -7,7 +7,7 @@
+ namespace Content.Client.Cargo.UI
+ {
+     [GenerateTypedNameReferences]
+-    public sealed partial class CargoProductRow : PanelContainer
++    public sealed partial class CargoProductRow : BoxContainer
+     {
+         public CargoProductPrototype? Product { get; set; }
+ 
+diff --git a/Resources/Locale/en-US/cargo/cargo-console-component.ftl b/Resources/Locale/en-US/cargo/cargo-console-component.ftl
+index bc28306db1..0a7c11576f 100644
+--- a/Resources/Locale/en-US/cargo/cargo-console-component.ftl
++++ b/Resources/Locale/en-US/cargo/cargo-console-component.ftl
+@@ -1,5 +1,8 @@
+ ## UI
++
+ cargo-console-menu-title = Cargo request console
++cargo-console-menu-flavor-left = Order even more pizza boxes than usual!
++cargo-console-menu-flavor-right = v2.1
+ cargo-console-menu-account-name-label = Account:{" "}
+ cargo-console-menu-account-name-none-text = None
+ cargo-console-menu-account-name-format = [bold][color={$color}]{$name}[/color][/bold] [font="Monospace"]\[{$code}\][/font]
+@@ -16,11 +19,14 @@ cargo-console-menu-categories-label = Categories:{" "}
+ cargo-console-menu-search-bar-placeholder = Search
+ cargo-console-menu-requests-label = Requests
+ cargo-console-menu-orders-label = Orders
+-cargo-console-menu-order-reason-description = Reasons: {$reason}
+ cargo-console-menu-populate-categories-all-text = All
+-cargo-console-menu-populate-orders-cargo-order-row-product-name-text = {$productName} (x{$orderAmount}) by {$orderRequester} from [color={$accountColor}]{$account}[/color]
+-cargo-console-menu-cargo-order-row-approve-button = Approve
+-cargo-console-menu-cargo-order-row-cancel-button = Cancel
++cargo-console-menu-order-row-title = {$productName} (x{$orderAmount} for {$orderPrice}$)
++cargo-console-menu-populate-orders-cargo-order-row-product-name-text = Requested by: {$orderRequester} from [color={$accountColor}]{$account}[/color]
++cargo-console-menu-order-row-product-description = Reason: {$orderReason}
++cargo-console-menu-order-row-button-approve = Approve
++cargo-console-menu-order-row-button-cancel = Cancel
++cargo-console-menu-order-row-alerts-reason-absent = The reason is not specified
++cargo-console-menu-order-row-alerts-requester-unknown = Unknown
+ cargo-console-menu-tab-title-orders = Orders
+ cargo-console-menu-tab-title-funds = Transfers
+ cargo-console-menu-account-action-transfer-limit = [bold]Transfer Limit:[/bold] ${$limit}

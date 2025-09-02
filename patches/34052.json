@@ -1,0 +1,13 @@
+{
+    "pr_number": 34052,
+    "commit": "559e16f5e35900ecc36b40f75d0781703fc107e2",
+    "changelog": {
+        "author": "VlaDOS1408",
+        "changes": [
+            {
+                "type": "Tweak",
+                "message": "Cargo console UI reworked!"
+            }
+        ]
+    }
+}
