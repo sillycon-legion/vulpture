@@ -243,18 +243,21 @@ index 5d64803273..663c09d6dc 100644
  
      private void OnGetState(EntityUid uid, NavMapComponent component, ref ComponentGetState args)
 diff --git a/Resources/Audio/Effects/attributions.yml b/Resources/Audio/Effects/attributions.yml
-index 9f85c4fb05..3e8bbaf860 100644
+index efac498a3b..8bd690a232 100644
 --- a/Resources/Audio/Effects/attributions.yml
 +++ b/Resources/Audio/Effects/attributions.yml
-@@ -266,3 +266,8 @@
-   copyright: 'created by Crinkem on Freesound'
+@@ -237,6 +237,11 @@
    license: "CC0-1.0"
-   source: https://freesound.org/people/Crinkem/sounds/492027/
-+
+   source: https://freesound.org/people/waveplaySFX/sounds/553744/
+ 
 +- files: [static1.ogg, static2.ogg, static3.ogg]
 +  copyright: Errant (github username Errant-4)
 +  license: CC-BY-SA-3.0
 +  source: https://github.com/space-wizards/space-station-14/pull/31653
++
+ - files: [paperdoor_openclose.ogg]
+   copyright: 'created by Vrymaa on Freesound and modified by Chaboricks'
+   license: "CC0-1.0"
 diff --git a/Resources/Audio/Effects/static1.ogg b/Resources/Audio/Effects/static1.ogg
 new file mode 100644
 index 0000000000000000000000000000000000000000..d3c791ef9fbcf5403d2a01e391982f10392d2496
@@ -709,7 +712,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml b/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
-index 6248207a81..4ee5d1db22 100644
+index 7c1bb7ef16..f1a025f43e 100644
 --- a/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
 +++ b/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
 @@ -107,6 +107,9 @@
@@ -723,10 +726,10 @@ index 6248207a81..4ee5d1db22 100644
      damageCoefficient: 0
  
 diff --git a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
-index 303f7dc676..3c9b74a424 100644
+index e18100ab8a..38987dfed8 100644
 --- a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
 +++ b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
-@@ -323,6 +323,9 @@
+@@ -328,6 +328,9 @@
      - state: ai_camera
        shader: unshaded
        map: ["base"]
