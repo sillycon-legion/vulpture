@@ -10397,7 +10397,7 @@ index 975c802eed..d5c168d9f0 100644
 +    }
  }
 diff --git a/Content.Server/Antag/AntagSelectionSystem.cs b/Content.Server/Antag/AntagSelectionSystem.cs
-index 7fdf812fbe..e895faff45 100644
+index 7fdf812fbe..76bf91d66f 100644
 --- a/Content.Server/Antag/AntagSelectionSystem.cs
 +++ b/Content.Server/Antag/AntagSelectionSystem.cs
 @@ -51,6 +51,7 @@ public sealed partial class AntagSelectionSystem : GameRuleSystem<AntagSelection
@@ -10408,16 +10408,48 @@ index 7fdf812fbe..e895faff45 100644
  
      // arbitrary random number to give late joining some mild interest.
      public const float LateJoinRandomChance = 0.5f;
-@@ -344,7 +345,7 @@ public bool TryMakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? se
+@@ -344,14 +345,21 @@ public bool TryMakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? se
      {
          _adminLogger.Add(LogType.AntagSelection, $"Start trying to make {session} become the antagonist: {ToPrettyString(ent)}");
  
 -        if (checkPref && !HasPrimaryAntagPreference(session, def))
-+        if (checkPref && !HasPrimaryAntagPreference(session, def, ent.Comp.SelectionTime))
+-            return false;
+-
+-        if (!IsSessionValid(ent, session, def) || !IsEntityValid(session?.AttachedEntity, def))
++        if (!IsSessionValid(ent, session, def))
++        {
++            _adminLogger.Add(LogType.AntagSelection, $"{session} didn't have valid session");
              return false;
++        }
  
-         if (!IsSessionValid(ent, session, def) || !IsEntityValid(session?.AttachedEntity, def))
-@@ -393,7 +394,7 @@ public void MakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? sessi
+         if (onlyPreSelect && session != null)
+         {
++            // This is preselection, so check if the PLAYER AS A WHOLE is compatible with the antagonist
++            if (checkPref && !HasPrimaryAntagPreference(session, def, ent.Comp.SelectionTime))
++            {
++                _adminLogger.Add(LogType.AntagSelection, $"{session} didn't have antagonist preference for {ToPrettyString(ent)}");
++                return false;
++            }
++
+             if (!ent.Comp.PreSelectedSessions.TryGetValue(def, out var set))
+                 ent.Comp.PreSelectedSessions.Add(def, set = new HashSet<ICommonSession>());
+             set.Add(session);
+@@ -360,6 +368,14 @@ public bool TryMakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? se
+         }
+         else
+         {
++            // This is not preselection, so check the player's actual entity to see if it's compatible with the antagonist.
++            // This function will also check the character profile's antagonist preferences.
++            if (!IsEntityValid(session?.AttachedEntity, def))
++            {
++                _adminLogger.Add(LogType.AntagSelection, $"{session} didn't have valid entity for {ToPrettyString(ent)}");
++                return false;
++            }
++
+             MakeAntag(ent, session, def, ignoreSpawner);
+         }
+ 
+@@ -393,7 +409,7 @@ public void MakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? sessi
  
          if (!antagEnt.HasValue)
          {
@@ -10426,7 +10458,7 @@ index 7fdf812fbe..e895faff45 100644
              RaiseLocalEvent(ent, ref getEntEv, true);
              antagEnt = getEntEv.Entity;
          }
-@@ -497,11 +498,11 @@ public AntagSelectionPlayerPool GetPlayerPool(Entity<AntagSelectionComponent> en
+@@ -497,11 +513,11 @@ public AntagSelectionPlayerPool GetPlayerPool(Entity<AntagSelectionComponent> en
              if (ent.Comp.PreSelectedSessions.TryGetValue(def, out var preSelected) && preSelected.Contains(session))
                  continue;
  
@@ -10440,7 +10472,7 @@ index 7fdf812fbe..e895faff45 100644
              {
                  fallbackList.Add(session);
              }
-@@ -573,6 +574,15 @@ public bool IsEntityValid(EntityUid? entity, AntagSelectionDefinition def)
+@@ -573,6 +589,15 @@ public bool IsEntityValid(EntityUid? entity, AntagSelectionDefinition def)
          if (!def.AllowNonHumans && !HasComp<HumanoidAppearanceComponent>(entity))
              return false;
  
@@ -10456,7 +10488,7 @@ index 7fdf812fbe..e895faff45 100644
          if (def.Whitelist != null)
          {
              if (!_whitelist.IsValid(def.Whitelist, entity.Value))
-@@ -603,13 +613,15 @@ private void OnObjectivesTextGetInfo(Entity<AntagSelectionComponent> ent, ref Ob
+@@ -603,13 +628,15 @@ private void OnObjectivesTextGetInfo(Entity<AntagSelectionComponent> ent, ref Ob
  /// Only raised if the selected player's current entity is invalid.
  /// </summary>
  [ByRefEvent]
@@ -10854,7 +10886,7 @@ index 63821d9251..bdf8cf035e 100644
          {
              if (!silent)
 diff --git a/Content.Server/GameTicking/GameTicker.RoundFlow.cs b/Content.Server/GameTicking/GameTicker.RoundFlow.cs
-index cb5a1a4187..5e708dee28 100644
+index 1dadca4c03..05e351c126 100644
 --- a/Content.Server/GameTicking/GameTicker.RoundFlow.cs
 +++ b/Content.Server/GameTicking/GameTicker.RoundFlow.cs
 @@ -370,7 +370,7 @@ public void StartRound(bool force = false)
@@ -10893,7 +10925,7 @@ index cb5a1a4187..5e708dee28 100644
  
              _roundStartDateTime = DateTime.UtcNow;
              RunLevel = GameRunLevel.InRound;
-@@ -942,13 +933,11 @@ public sealed class RulePlayerSpawningEvent
+@@ -940,13 +931,11 @@ public sealed class RulePlayerSpawningEvent
          /// </summary>
          /// <remarks>If you spawn a player by yourself from this event, don't forget to call <see cref="GameTicker.PlayerJoinGame"/> on them.</remarks>
          public List<ICommonSession> PlayerPool { get; }
@@ -10908,7 +10940,7 @@ index cb5a1a4187..5e708dee28 100644
              Forced = forced;
          }
      }
-@@ -960,13 +949,11 @@ public RulePlayerSpawningEvent(List<ICommonSession> playerPool, IReadOnlyDiction
+@@ -958,13 +947,11 @@ public RulePlayerSpawningEvent(List<ICommonSession> playerPool, IReadOnlyDiction
      public sealed class RulePlayerJobsAssignedEvent
      {
          public ICommonSession[] Players { get; }
@@ -11144,20 +11176,20 @@ index 194f6c4997..01a97abe7a 100644
                  mind = (mindId, mindComp);
                  _mind.SetUserId(mind.Value, player.UserId);
 diff --git a/Content.Server/GameTicking/GameTicker.cs b/Content.Server/GameTicking/GameTicker.cs
-index 290d363047..74c9486ff8 100644
+index 55bf51db02..5b2f4a907c 100644
 --- a/Content.Server/GameTicking/GameTicker.cs
 +++ b/Content.Server/GameTicking/GameTicker.cs
 @@ -1,5 +1,6 @@
  using Content.Server.Administration.Logs;
  using Content.Server.Administration.Managers;
 +using Content.Server.Antag;
- using Content.Server.BugReports;
  using Content.Server.Chat.Managers;
  using Content.Server.Chat.Systems;
-@@ -67,6 +68,7 @@ public sealed partial class GameTicker : SharedGameTicker
+ using Content.Server.Database;
+@@ -65,6 +66,7 @@ public sealed partial class GameTicker : SharedGameTicker
+         [Dependency] private readonly MetaDataSystem _metaData = default!;
          [Dependency] private readonly SharedRoleSystem _roles = default!;
          [Dependency] private readonly ServerDbEntryManager _dbEntryManager = default!;
-         [Dependency] private readonly IBugReportManager _bugManager = default!;
 +        [Dependency] private readonly AntagSelectionSystem _antagSelection = default!;
  
          [ViewVariables] private bool _initialized;
@@ -11304,7 +11336,7 @@ index 38102f1a2e..44b71d95bf 100644
          return true;
      }
 diff --git a/Content.Server/Implants/ChameleonControllerSystem.cs b/Content.Server/Implants/ChameleonControllerSystem.cs
-index 9e876f9399..6e96438751 100644
+index 930f2e3156..db2d0031dc 100644
 --- a/Content.Server/Implants/ChameleonControllerSystem.cs
 +++ b/Content.Server/Implants/ChameleonControllerSystem.cs
 @@ -2,16 +2,14 @@
@@ -13058,10 +13090,10 @@ index 5ca4673f6b..a89062a3ee 100644
  character-setup-gui-save-panel-title = Unsaved character changes
  character-setup-gui-save-panel-save = Save
 diff --git a/Resources/Prototypes/GameRules/events.yml b/Resources/Prototypes/GameRules/events.yml
-index 2642c0286b..f77519b9c1 100644
+index c9e612c7f5..9a2a458030 100644
 --- a/Resources/Prototypes/GameRules/events.yml
 +++ b/Resources/Prototypes/GameRules/events.yml
-@@ -217,6 +217,7 @@
+@@ -237,6 +237,7 @@
      - spawnerPrototype: SpawnPointGhostSpaceNinja
        min: 1
        max: 1
@@ -13069,7 +13101,7 @@ index 2642c0286b..f77519b9c1 100644
        pickPlayer: false
        startingGear: SpaceNinjaGear
        roleLoadout:
-@@ -553,6 +554,7 @@
+@@ -573,6 +574,7 @@
      - spawnerPrototype: SpawnPointLoneNukeOperative
        min: 1
        max: 1
