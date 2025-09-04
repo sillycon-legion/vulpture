@@ -25,9 +25,6 @@ By Quantum-cross in [#36493](https://github.com/space-wizards/space-station-14/p
 By ScarKy0, MilonPL, beck-thompson in [#37539](https://github.com/space-wizards/space-station-14/pull/37539):
 - add: The vulpkanin species can now be selected as a roundstart species.
 
-By Quantum-cross in [#37585](https://github.com/space-wizards/space-station-14/pull/37585):
-- add: The anomaly scanner has received an upgrade, showing some information without opening the UI.
-
 By ruddygreat in [#38216](https://github.com/space-wizards/space-station-14/pull/38216):
 - add: Added organisational capabilities to the cargo bounty computer.
 
