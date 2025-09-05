@@ -280,7 +280,7 @@ index 867a7bb8a5..c847ae56cd 100644
      }
  }
 diff --git a/Content.Client/Lobby/LobbyUIController.cs b/Content.Client/Lobby/LobbyUIController.cs
-index 121e8dbe71..9be104d3ab 100644
+index ec052adea5..ad8a7d9789 100644
 --- a/Content.Client/Lobby/LobbyUIController.cs
 +++ b/Content.Client/Lobby/LobbyUIController.cs
 @@ -1,4 +1,3 @@
@@ -322,19 +322,21 @@ index 121e8dbe71..9be104d3ab 100644
      /// <summary>
      /// This is the characher preview panel in the chat. This should only update if their character updates.
      /// </summary>
-@@ -71,9 +73,9 @@ public override void Initialize()
+@@ -71,10 +73,10 @@ public override void Initialize()
              _profileEditor?.RefreshFlavorText();
          });
  
 -        _configurationManager.OnValueChanged(CCVars.GameRoleTimers, _ => RefreshProfileEditor());
+-        _configurationManager.OnValueChanged(CCVars.GameRoleLoadoutTimers, _ => RefreshProfileEditor());
 +        _configurationManager.OnValueChanged(CCVars.GameRoleTimers, _ => RefreshEditors());
++        _configurationManager.OnValueChanged(CCVars.GameRoleLoadoutTimers, _ => RefreshEditors());
  
 -        _configurationManager.OnValueChanged(CCVars.GameRoleWhitelist, _ => RefreshProfileEditor());
 +        _configurationManager.OnValueChanged(CCVars.GameRoleWhitelist, _ => RefreshEditors());
      }
  
      private LobbyCharacterPreviewPanel? GetLobbyPreview()
-@@ -88,11 +90,9 @@ public override void Initialize()
+@@ -89,11 +91,9 @@ public override void Initialize()
  
      private void OnRequirementsUpdated()
      {
@@ -349,7 +351,7 @@ index 121e8dbe71..9be104d3ab 100644
      }
  
      private void OnProtoReload(PrototypesReloadedEventArgs obj)
-@@ -127,6 +127,7 @@ private void OnProtoReload(PrototypesReloadedEventArgs obj)
+@@ -128,6 +128,7 @@ private void OnProtoReload(PrototypesReloadedEventArgs obj)
                  _profileEditor.RefreshTraits();
              }
          }
@@ -357,7 +359,7 @@ index 121e8dbe71..9be104d3ab 100644
      }
  
      private void PreferencesDataLoaded()
-@@ -136,23 +137,27 @@ private void PreferencesDataLoaded()
+@@ -137,23 +138,27 @@ private void PreferencesDataLoaded()
          if (_stateManager.CurrentState is not LobbyState)
              return;
  
@@ -389,7 +391,7 @@ index 121e8dbe71..9be104d3ab 100644
      }
  
      /// <summary>
-@@ -163,9 +168,8 @@ public void ReloadCharacterSetup()
+@@ -164,9 +169,8 @@ public void ReloadCharacterSetup()
          RefreshLobbyPreview();
          var (characterGui, profileEditor) = EnsureGui();
          characterGui.ReloadCharacterPickers();
@@ -401,7 +403,7 @@ index 121e8dbe71..9be104d3ab 100644
      }
  
      /// <summary>
-@@ -173,29 +177,38 @@ public void ReloadCharacterSetup()
+@@ -174,29 +178,38 @@ public void ReloadCharacterSetup()
      /// </summary>
      private void RefreshLobbyPreview()
      {
@@ -457,7 +459,7 @@ index 121e8dbe71..9be104d3ab 100644
      }
  
      private void SaveProfile()
-@@ -205,12 +218,13 @@ private void SaveProfile()
+@@ -206,12 +219,13 @@ private void SaveProfile()
          if (EditedProfile == null || EditedSlot == null)
              return;
  
@@ -476,7 +478,7 @@ index 121e8dbe71..9be104d3ab 100644
          ReloadCharacterSetup();
      }
  
-@@ -226,9 +240,10 @@ private void CloseProfileEditor()
+@@ -227,9 +241,10 @@ private void CloseProfileEditor()
          {
              lobbyGui.SwitchState(LobbyGui.LobbyGuiState.Default);
          }
@@ -488,7 +490,7 @@ index 121e8dbe71..9be104d3ab 100644
      {
          if (_savePanel is { IsOpen: true })
              return;
-@@ -237,7 +252,7 @@ private void OpenSavePanel()
+@@ -238,7 +253,7 @@ private void OpenSavePanel()
  
          _savePanel.SaveButton.OnPressed += _ =>
          {
@@ -497,7 +499,7 @@ index 121e8dbe71..9be104d3ab 100644
  
              _savePanel.Close();
  
-@@ -275,16 +290,27 @@ private void OpenSavePanel()
+@@ -276,16 +291,27 @@ private void OpenSavePanel()
              _requirements,
              _markings);
  
@@ -528,7 +530,7 @@ index 121e8dbe71..9be104d3ab 100644
  
                  return;
              }
-@@ -297,7 +323,9 @@ private void OpenSavePanel()
+@@ -298,7 +324,9 @@ private void OpenSavePanel()
  
          _characterSetup.SelectCharacter += args =>
          {
@@ -539,7 +541,7 @@ index 121e8dbe71..9be104d3ab 100644
              ReloadCharacterSetup();
          };
  
-@@ -317,6 +345,13 @@ private void OpenSavePanel()
+@@ -318,6 +346,13 @@ private void OpenSavePanel()
              }
          };
  
@@ -553,7 +555,7 @@ index 121e8dbe71..9be104d3ab 100644
          if (_stateManager.CurrentState is LobbyState lobby)
          {
              lobby.Lobby?.CharacterSetupState.AddChild(_characterSetup);
-@@ -324,176 +359,4 @@ private void OpenSavePanel()
+@@ -325,176 +360,4 @@ private void OpenSavePanel()
  
          return (_characterSetup, _profileEditor);
      }
@@ -10851,7 +10853,7 @@ index a32a2f9495..767a4d1c58 100644
              }
  
 diff --git a/Content.Server/GameTicking/GameTicker.Lobby.cs b/Content.Server/GameTicking/GameTicker.Lobby.cs
-index 9a9eb61b67..1f93e02915 100644
+index 66c39ab469..994e26798c 100644
 --- a/Content.Server/GameTicking/GameTicker.Lobby.cs
 +++ b/Content.Server/GameTicking/GameTicker.Lobby.cs
 @@ -173,8 +173,12 @@ public void ToggleReady(ICommonSession player, bool ready)
@@ -13090,10 +13092,10 @@ index 5ca4673f6b..a89062a3ee 100644
  character-setup-gui-save-panel-title = Unsaved character changes
  character-setup-gui-save-panel-save = Save
 diff --git a/Resources/Prototypes/GameRules/events.yml b/Resources/Prototypes/GameRules/events.yml
-index c9e612c7f5..9a2a458030 100644
+index 73ed173fdf..f9db01cc80 100644
 --- a/Resources/Prototypes/GameRules/events.yml
 +++ b/Resources/Prototypes/GameRules/events.yml
-@@ -237,6 +237,7 @@
+@@ -241,6 +241,7 @@
      - spawnerPrototype: SpawnPointGhostSpaceNinja
        min: 1
        max: 1
@@ -13101,7 +13103,7 @@ index c9e612c7f5..9a2a458030 100644
        pickPlayer: false
        startingGear: SpaceNinjaGear
        roleLoadout:
-@@ -573,6 +574,7 @@
+@@ -577,6 +578,7 @@
      - spawnerPrototype: SpawnPointLoneNukeOperative
        min: 1
        max: 1
