@@ -1,0 +1,68 @@
+diff --git a/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml b/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
+index 7c1bb7ef16..ee5980784e 100644
+--- a/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
++++ b/Resources/Prototypes/Entities/Mobs/Player/admin_ghost.yml
+@@ -4,6 +4,16 @@
+   name: admin observer
+   categories: [ HideSpawnMenu ]
+   components:
++  - type: Sprite
++    layers:
++    - map: ["enum.DamageStateVisualLayers.Base"]
++      sprite: Mobs/Animals/scurret/scurret.rsi
++      state: scurret
++    - map: [ "enum.HumanoidVisualLayers.Handcuffs" ]
++      color: "#ffffff"
++      sprite: Objects/Misc/handcuffs.rsi
++      state: body-overlay-2
++      visible: false
+   - type: ContentEye
+     maxZoom: 8.916104, 8.916104
+   - type: Tag
+diff --git a/Resources/ServerInfo/Guidebook/ServerRules/BanTypes.xml b/Resources/ServerInfo/Guidebook/ServerRules/BanTypes.xml
+index b10ea3c393..4c4a698065 100644
+--- a/Resources/ServerInfo/Guidebook/ServerRules/BanTypes.xml
++++ b/Resources/ServerInfo/Guidebook/ServerRules/BanTypes.xml
+@@ -7,5 +7,5 @@
+   Also called a "job ban", this ban prevents your character from joining or late-joining a round as one or more jobs or roles. These are often used in response to problematic behavior in particular departments or address gross inexperience in important roles such as heads of staff. These bans do not mechanically prevent you from switching to the role during a round or acting as that role, but doing so is considered ban evasion.
+ 
+   ## Game Ban
+-  Also called a "server ban", this ban prevents you from connecting to all Wizard's Den servers.
++  Also called a "server ban", this ban prevents you from connecting to all Wizard's Lab servers.
+ </Document>
+diff --git a/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml b/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml
+index fdd9931c93..a14b01f2cc 100644
+--- a/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml
++++ b/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml
+@@ -1,6 +1,6 @@
+ ﻿<Document>
+   # Server Rules
+-  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
++  This is a Wizard's Lab server, an unofficial server for playtesting.
+ 
+   [color=#ff0000]Only the Core Rules apply on this server.[/color] This is NOT a medium roleplay (MRP) server, meaning that MRP Amendments do NOT apply.
+ 
+diff --git a/Resources/ServerInfo/Guidebook/ServerRules/WizDenLRPRules.xml b/Resources/ServerInfo/Guidebook/ServerRules/WizDenLRPRules.xml
+index 6e96faee59..11bf67abc4 100644
+--- a/Resources/ServerInfo/Guidebook/ServerRules/WizDenLRPRules.xml
++++ b/Resources/ServerInfo/Guidebook/ServerRules/WizDenLRPRules.xml
+@@ -1,6 +1,6 @@
+ ﻿<Document>
+   # Server Rules
+-  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
++  This is a Wizard's Lab server, an unofficial server for playtesting.
+ 
+   This is a roleplay server, meaning that roleplay rules apply. This is NOT a medium roleplay (MRP) server, meaning that MRP Amendments do NOT apply.
+ 
+diff --git a/Resources/ServerInfo/Guidebook/ServerRules/WizDenMRPRules.xml b/Resources/ServerInfo/Guidebook/ServerRules/WizDenMRPRules.xml
+index 0954a79859..786fd28971 100644
+--- a/Resources/ServerInfo/Guidebook/ServerRules/WizDenMRPRules.xml
++++ b/Resources/ServerInfo/Guidebook/ServerRules/WizDenMRPRules.xml
+@@ -1,6 +1,6 @@
+ <Document>
+   # Server Rules
+-  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
++  This is a Wizard's Lab server, an unofficial server for playtesting.
+ 
+   This is a roleplay server, meaning that roleplay rules apply. [color=#ff0000]This is also a medium roleplay (MRP) server, meaning that MRP Amendments do apply.[/color]
+ 
