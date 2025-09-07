@@ -49,7 +49,7 @@ if len(changelog["Entries"]) > 0:
 subprocess.run(["dotnet", "restore"], cwd="src", check=True)
 subprocess.run(["dotnet", "build", "Content.Packaging", "--configuration", "Release", "--no-restore", "/m"], cwd="src", check=True)
 # subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--hybrid-acz", "--platform", "linux-x64"], cwd="src", check=True)
-subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--platform", "win-x64", "--platform", "linux-x64", "--platform", "osx-x64", "--platform", "linux-arm64"], cwd="src", check=True)
+subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--platform", "win-x64", "--platform", "win-arm64", "--platform", "linux-x64", "--platform", "linux-arm64", "--platform", "osx-x64", "--platform", "osx-arm64"], cwd="src", check=True)
 subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "client", "--no-wipe-release"], cwd="src", check=True)
 shutil.move("src/release", "release")
 
