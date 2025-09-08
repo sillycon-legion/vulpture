@@ -1,0 +1,13 @@
+{
+    "pr_number": 39582,
+    "commit": "bdc45b9ee22e6d8943f974ad3e12586bdfa5fc50",
+    "changelog": {
+        "author": "UpAndLeaves",
+        "changes": [
+            {
+                "type": "Add",
+                "message": "Puddles are now flammable, flammable substances may cause \"reagent fires\" if ignited."
+            }
+        ]
+    }
+}

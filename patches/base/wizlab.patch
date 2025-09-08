@@ -28,7 +28,7 @@ index b10ea3c393..4c4a698065 100644
  
    ## Game Ban
 -  Also called a "server ban", this ban prevents you from connecting to all Wizard's Den servers.
-+  Also called a "server ban", this ban prevents you from connecting to all Wizard's Lab servers.
++  Also called a "server ban", this ban prevents you from connecting to all Witch's Lab servers.
  </Document>
 diff --git a/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml b/Resources/ServerInfo/Guidebook/ServerRules/WizDenCoreOnlyRules.xml
 index fdd9931c93..a14b01f2cc 100644
@@ -38,7 +38,7 @@ index fdd9931c93..a14b01f2cc 100644
  ﻿<Document>
    # Server Rules
 -  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
-+  This is a Wizard's Lab server, an unofficial server for playtesting.
++  This is a Witch's Lab server, an unofficial server for playtesting.
  
    [color=#ff0000]Only the Core Rules apply on this server.[/color] This is NOT a medium roleplay (MRP) server, meaning that MRP Amendments do NOT apply.
  
@@ -50,7 +50,7 @@ index 6e96faee59..11bf67abc4 100644
  ﻿<Document>
    # Server Rules
 -  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
-+  This is a Wizard's Lab server, an unofficial server for playtesting.
++  This is a Witch's Lab server, an unofficial server for playtesting.
  
    This is a roleplay server, meaning that roleplay rules apply. This is NOT a medium roleplay (MRP) server, meaning that MRP Amendments do NOT apply.
  
@@ -62,7 +62,7 @@ index 0954a79859..786fd28971 100644
  <Document>
    # Server Rules
 -  This is a Wizard's Den server, one of the official Space Station 14 servers. If you are banned on this server, you will be banned on all official servers.
-+  This is a Wizard's Lab server, an unofficial server for playtesting.
++  This is a Witch's Lab server, an unofficial server for playtesting.
  
    This is a roleplay server, meaning that roleplay rules apply. [color=#ff0000]This is also a medium roleplay (MRP) server, meaning that MRP Amendments do apply.[/color]
  

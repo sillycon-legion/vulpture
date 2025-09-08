@@ -5,7 +5,7 @@ import json
 
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 
-for patch in glob.glob("patches/*.json"):
+for patch in glob.glob("patches/**/*.json", recursive=True):
     patchid = patch[8:-5]
     with open(patch) as f:
         patchmeta = json.load(f)

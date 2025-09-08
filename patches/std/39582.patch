@@ -1,0 +1,1059 @@
+diff --git a/Content.Client/Atmos/Overlays/GasTileOverlay.cs b/Content.Client/Atmos/Overlays/GasTileOverlay.cs
+index d91cc29e4c..b48ae83b9c 100644
+--- a/Content.Client/Atmos/Overlays/GasTileOverlay.cs
++++ b/Content.Client/Atmos/Overlays/GasTileOverlay.cs
+@@ -38,7 +38,7 @@ public sealed class GasTileOverlay : Overlay
+         private readonly Texture[][] _frames;
+ 
+         // Fire overlays
+-        private const int FireStates = 3;
++        private const int FireStates = 6;
+         private const string FireRsiPath = "/Textures/Effects/fire.rsi";
+ 
+         private readonly float[] _fireTimer = new float[FireStates];
+@@ -247,7 +247,7 @@ protected override void Draw(in OverlayDrawArgs args)
+                             if (!localBounds.Contains(index))
+                                 continue;
+ 
+-                            var fireState = gas.FireState - 1;
++                            var fireState = gas.FireState - 1 + gas.FireType * 3;
+                             var texture = state.fireFrames[fireState][state.fireFrameCounter[fireState]];
+                             state.drawHandle.DrawTexture(texture, index);
+                         }
+diff --git a/Content.Server/Atmos/EntitySystems/AtmosphereSystem.API.cs b/Content.Server/Atmos/EntitySystems/AtmosphereSystem.API.cs
+index 87cfce135d..69b173c009 100644
+--- a/Content.Server/Atmos/EntitySystems/AtmosphereSystem.API.cs
++++ b/Content.Server/Atmos/EntitySystems/AtmosphereSystem.API.cs
+@@ -6,6 +6,7 @@
+ using Content.Shared.Atmos;
+ using Content.Shared.Atmos.Components;
+ using Content.Shared.Atmos.Reactions;
++using Content.Shared.Fluids.Components;
+ using JetBrains.Annotations;
+ using Robust.Shared.Map.Components;
+ using Robust.Shared.Utility;
+@@ -321,6 +322,27 @@ public bool RemoveAtmosDevice(Entity<GridAtmosphereComponent?> grid, Entity<Atmo
+         return true;
+     }
+ 
++    public bool SetPuddleFlammabilityAtTile(Entity<TransformComponent?> ent, int flammability = 0)
++    {
++        if (!Resolve(ent, ref ent.Comp, false))
++            return false;
++        var grid = ent.Comp.GridUid;
++        var position = _transformSystem.GetGridTilePositionOrDefault((ent, ent.Comp));
++        return SetPuddleFlammabilityAtTile(position, grid, flammability);
++
++    }
++
++    public bool SetPuddleFlammabilityAtTile(Vector2i position,
++        Entity<GridAtmosphereComponent?>? grid,
++        int flammability = 0)
++    {
++        if (grid is not { } gridEnt || !Resolve(gridEnt, ref gridEnt.Comp, false) ||
++            !gridEnt.Comp.Tiles.TryGetValue(position, out var atmosTile))
++            return false;
++        atmosTile.PuddleSolutionFlammability = flammability;
++        return true;
++    }
++
+     /// <summary>
+     /// Adds an entity with a DeltaPressureComponent to the DeltaPressure processing list.
+     /// Also fills in important information on the component itself.
+diff --git a/Content.Server/Atmos/EntitySystems/AtmosphereSystem.Hotspot.cs b/Content.Server/Atmos/EntitySystems/AtmosphereSystem.Hotspot.cs
+index 613fcd14a6..33ad45fa5a 100644
+--- a/Content.Server/Atmos/EntitySystems/AtmosphereSystem.Hotspot.cs
++++ b/Content.Server/Atmos/EntitySystems/AtmosphereSystem.Hotspot.cs
+@@ -26,6 +26,9 @@ public sealed partial class AtmosphereSystem
+         [ViewVariables(VVAccess.ReadWrite)]
+         public SoundSpecifier? HotspotSound { get; private set; } = new SoundCollectionSpecifier(DefaultHotspotSounds);
+ 
++        /// <summary>
++        /// Run every tick on every hotspot
++        /// </summary>
+         private void ProcessHotspot(
+             Entity<GridAtmosphereComponent, GasTileOverlayComponent, MapGridComponent, TransformComponent> ent,
+             TileAtmosphere tile)
+@@ -48,17 +51,21 @@ private void ProcessHotspot(
+             if(tile.ExcitedGroup != null)
+                 ExcitedGroupResetCooldowns(tile.ExcitedGroup);
+ 
++            // If the hotspot is too weak to exist/doesn't have the correct conditions, yeet it for deletion at the end of the tick
+             if ((tile.Hotspot.Temperature < Atmospherics.FireMinimumTemperatureToExist) || (tile.Hotspot.Volume <= 1f)
+-                || tile.Air == null || tile.Air.GetMoles(Gas.Oxygen) < 0.5f || (tile.Air.GetMoles(Gas.Plasma) < 0.5f && tile.Air.GetMoles(Gas.Tritium) < 0.5f))
++                || tile.Air == null || tile.Air.GetMoles(Gas.Oxygen) < 0.5f || (tile.Air.GetMoles(Gas.Plasma) < 0.5f && tile.Air.GetMoles(Gas.Tritium) < 0.5f) && tile.PuddleSolutionFlammability == 0)
+             {
+                 tile.Hotspot = new Hotspot();
++                tile.Hotspot.Type = tile.PuddleSolutionFlammability > 0 ? HotspotType.Puddle : HotspotType.Gas;
+                 InvalidateVisuals(ent, tile);
+                 return;
+             }
+ 
+             PerformHotspotExposure(tile);
+ 
+-            if (tile.Hotspot.Bypassing)
++            tile.Hotspot.Type = tile.PuddleSolutionFlammability > 0 ? HotspotType.Puddle : HotspotType.Gas;
++
++            if (tile.Hotspot.Bypassing || tile.PuddleSolutionFlammability > 0)
+             {
+                 tile.Hotspot.State = 3;
+ 
+@@ -124,6 +131,9 @@ private void ProcessHotspot(
+             // TODO ATMOS Maybe destroy location here?
+         }
+ 
++        /// <summary>
++        /// Run whenever you want to try start a hotspot: run every tick by ignition sources, and also ran on tiles whenever a fire/hotspot is spreading
++        /// </summary>
+         private void HotspotExpose(GridAtmosphereComponent gridAtmosphere, TileAtmosphere tile,
+             float exposedTemperature, float exposedVolume, bool soh = false, EntityUid? sparkSourceUid = null)
+         {
+@@ -137,12 +147,14 @@ private void HotspotExpose(GridAtmosphereComponent gridAtmosphere, TileAtmospher
+ 
+             var plasma = tile.Air.GetMoles(Gas.Plasma);
+             var tritium = tile.Air.GetMoles(Gas.Tritium);
++            var puddleFlammability = tile.PuddleSolutionFlammability;
+ 
++            // If a hotspot already exists on this tile, just strengthen it and return early.
+             if (tile.Hotspot.Valid)
+             {
+                 if (soh)
+                 {
+-                    if (plasma > 0.5f || tritium > 0.5f)
++                    if (plasma > 0.5f || tritium > 0.5f || puddleFlammability > 0)
+                     {
+                         if (tile.Hotspot.Temperature < exposedTemperature)
+                             tile.Hotspot.Temperature = exposedTemperature;
+@@ -150,22 +162,28 @@ private void HotspotExpose(GridAtmosphereComponent gridAtmosphere, TileAtmospher
+                             tile.Hotspot.Volume = exposedVolume;
+                     }
+                 }
++                tile.Hotspot.Temperature = AddClampedTemperature(tile.Hotspot.Temperature, 5 * puddleFlammability, (float)(Atmospherics.T0C + 20 * Math.Pow(puddleFlammability, 2)));
+ 
+                 return;
+             }
+ 
+-            if ((exposedTemperature > Atmospherics.PlasmaMinimumBurnTemperature) && (plasma > 0.5f || tritium > 0.5f))
++            // If the conditions are right for a hotspot to be created, do so!
++            if ((exposedTemperature > Atmospherics.PlasmaMinimumBurnTemperature && (plasma > 0.5f || tritium > 0.5f)) || (puddleFlammability > 0 && exposedTemperature > 573.15 - 50 * puddleFlammability) )
+             {
+                 if (sparkSourceUid.HasValue)
+                     _adminLog.Add(LogType.Flammable, LogImpact.High, $"Heat/spark of {ToPrettyString(sparkSourceUid.Value)} caused atmos ignition of gas: {tile.Air.Temperature.ToString():temperature}K - {oxygen}mol Oxygen, {plasma}mol Plasma, {tritium}mol Tritium");
+ 
++                var temperature = exposedTemperature;
++                if(puddleFlammability > 0)
++                    temperature = AddClampedTemperature(temperature, 5 * puddleFlammability, (float)(Atmospherics.T0C + 20 * Math.Pow(puddleFlammability, 2)));
+                 tile.Hotspot = new Hotspot
+                 {
+                     Volume = exposedVolume * 25f,
+-                    Temperature = exposedTemperature,
++                    Temperature = temperature,
+                     SkippedFirstProcess = tile.CurrentCycle > gridAtmosphere.UpdateCounter,
+                     Valid = true,
+-                    State = 1
++                    State = 1,
++                    Type = puddleFlammability > 0 ? HotspotType.Puddle : HotspotType.Gas
+                 };
+ 
+                 AddActiveTile(gridAtmosphere, tile);
+@@ -173,11 +191,16 @@ private void HotspotExpose(GridAtmosphereComponent gridAtmosphere, TileAtmospher
+             }
+         }
+ 
++        /// <summary>
++        /// The actual meat of how a hotspot reacts with the atmos system is done here, called via ProcessHotspot once a tick
++        /// </summary>
+         private void PerformHotspotExposure(TileAtmosphere tile)
+         {
+-            if (tile.Air == null || !tile.Hotspot.Valid) return;
++            if (tile.Air == null || !tile.Hotspot.Valid)
++                return;
+ 
+-            tile.Hotspot.Bypassing = tile.Hotspot.SkippedFirstProcess && tile.Hotspot.Volume > tile.Air.Volume*0.95f;
++            // A bypassing hotspot does NOT interact with atmos (intended for plasma/trit fires "carrying" the hotspot with them)
++            tile.Hotspot.Bypassing = tile.Hotspot.SkippedFirstProcess && tile.Hotspot.Volume > tile.Air.Volume*0.95f && tile.PuddleSolutionFlammability == 0;
+ 
+             if (tile.Hotspot.Bypassing)
+             {
+@@ -187,7 +210,7 @@ private void PerformHotspotExposure(TileAtmosphere tile)
+             else
+             {
+                 var affected = tile.Air.RemoveVolume(tile.Hotspot.Volume);
+-                affected.Temperature = tile.Hotspot.Temperature;
++                affected.Temperature = MathF.Max(tile.Hotspot.Temperature, Atmospherics.T0C + 50 * tile.PuddleSolutionFlammability);
+                 React(affected, tile);
+                 tile.Hotspot.Temperature = affected.Temperature;
+                 tile.Hotspot.Volume = affected.ReactionResults[(byte)GasReaction.Fire] * Atmospherics.FireGrowthRate;
+@@ -203,5 +226,13 @@ private void PerformHotspotExposure(TileAtmosphere tile)
+                 RaiseLocalEvent(entity, ref fireEvent);
+             }
+         }
++
++        /// <summary>
++        /// Used for reagent fires to ensure the temperature doesn't get too far out of control.
++        /// </summary>
++        private float AddClampedTemperature(float temperature, float kelvinToAdd, float clampTemperature)
++        {
++            return MathF.Max(temperature, MathF.Min(temperature + kelvinToAdd, clampTemperature));
++        }
+     }
+ }
+diff --git a/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs b/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
+index e63a57c3b6..459aa67aa4 100644
+--- a/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
++++ b/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
+@@ -179,7 +179,7 @@ private byte GetOpacity(float moles, float molesVisible, float molesVisibleMax)
+ 
+         public GasOverlayData GetOverlayData(GasMixture? mixture)
+         {
+-            var data = new GasOverlayData(0,
++            var data = new GasOverlayData(0, 0,
+                 new byte[VisibleGasId.Length],
+                 mixture?.Temperature ?? Atmospherics.TCMB);
+ 
+@@ -225,13 +225,13 @@ private bool UpdateChunkTile(GridAtmosphereComponent gridAtmosphere, GasOverlayC
+             if (oldData.Equals(default))
+             {
+                 changed = true;
+-                oldData = new GasOverlayData(tile.Hotspot.State, new byte[VisibleGasId.Length], temp);
++                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, new byte[VisibleGasId.Length], temp);
+             }
+-            else if (oldData.FireState != tile.Hotspot.State ||
++            else if (oldData.FireState != tile.Hotspot.State || oldData.FireType != (byte)tile.Hotspot.Type ||
+                      CheckTemperatureTolerance(oldData.Temperature, temp, _heatDistortionStrengthChangeTolerance))
+             {
+                 changed = true;
+-                oldData = new GasOverlayData(tile.Hotspot.State, oldData.Opacity, temp);
++                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, oldData.Opacity, temp);
+             }
+ 
+             if (tile is {Air: not null, NoGridTile: false})
+diff --git a/Content.Server/Atmos/Hotspot.cs b/Content.Server/Atmos/Hotspot.cs
+index 987acf73c2..db63fd698c 100644
+--- a/Content.Server/Atmos/Hotspot.cs
++++ b/Content.Server/Atmos/Hotspot.cs
+@@ -22,5 +22,14 @@ public struct Hotspot
+         /// </summary>
+         [ViewVariables]
+         public byte State;
++
++        [ViewVariables]
++        public HotspotType Type;
+     }
+ }
++
++public enum HotspotType : byte
++{
++    Gas = 0,
++    Puddle = 1
++}
+diff --git a/Content.Server/Atmos/TileAtmosphere.cs b/Content.Server/Atmos/TileAtmosphere.cs
+index 46a85990fa..807f1ec866 100644
+--- a/Content.Server/Atmos/TileAtmosphere.cs
++++ b/Content.Server/Atmos/TileAtmosphere.cs
+@@ -109,6 +109,9 @@ GasMixture IGasMixtureHolder.Air
+         [ViewVariables]
+         public float MaxFireTemperatureSustained { get; set; }
+ 
++        [ViewVariables]
++        public int PuddleSolutionFlammability { get; set; }
++
+         /// <summary>
+         /// If true, then this tile is directly exposed to the map's atmosphere, either because the grid has no tile at
+         /// this position, or because the tile type is not airtight.
+diff --git a/Content.Server/Fluids/EntitySystems/PuddleSystem.cs b/Content.Server/Fluids/EntitySystems/PuddleSystem.cs
+index 63ee75618c..d55412c966 100644
+--- a/Content.Server/Fluids/EntitySystems/PuddleSystem.cs
++++ b/Content.Server/Fluids/EntitySystems/PuddleSystem.cs
+@@ -1,5 +1,6 @@
+ using System.Linq;
+ using Content.Server.Administration.Logs;
++using Content.Server.Atmos.EntitySystems;
+ using Content.Server.Chemistry.TileReactions;
+ using Content.Server.DoAfter;
+ using Content.Server.Fluids.Components;
+@@ -58,6 +59,7 @@ public sealed partial class PuddleSystem : SharedPuddleSystem
+     [Dependency] private readonly TileFrictionController _tile = default!;
+     [Dependency] private readonly SharedTransformSystem _transform = default!;
+     [Dependency] private readonly TurfSystem _turf = default!;
++    [Dependency] private readonly AtmosphereSystem _atmos = default!;
+ 
+     // Using local deletion queue instead of the standard queue so that we can easily "undelete" if a puddle
+     // loses & then gains reagents in a single tick.
+@@ -303,6 +305,7 @@ public override void Update(float frameTime)
+         base.Update(frameTime);
+         foreach (var ent in _deletionQueue)
+         {
++            UpdateFlammability(ent, null);
+             Del(ent);
+         }
+ 
+@@ -325,11 +328,25 @@ protected override void OnSolutionUpdate(Entity<PuddleComponent> entity, ref Sol
+         }
+ 
+         _deletionQueue.Remove(entity);
++        UpdateFlammability((entity.Owner, entity.Comp), args.Solution);
+         UpdateSlip((entity, entity.Comp), args.Solution);
+         UpdateSlow(entity, args.Solution);
+         UpdateEvaporation(entity, args.Solution);
+     }
+ 
++    private void UpdateFlammability(Entity<PuddleComponent?> entity, Solution? solution)
++    {
++        if (solution is null)
++        {
++            _atmos.SetPuddleFlammabilityAtTile(entity.Owner, 0);
++            return;
++        }
++
++        var flammability = solution.GetSolutionFlammability(_prototypeManager);
++        _atmos.SetPuddleFlammabilityAtTile(entity.Owner, flammability);
++
++    }
++
+     private void UpdateSlip(Entity<PuddleComponent> entity, Solution solution)
+     {
+         if (!TryComp<StepTriggerComponent>(entity, out var comp))
+diff --git a/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs b/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
+index 1c7da938d4..8130aa5f8a 100644
+--- a/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
++++ b/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
+@@ -117,6 +117,9 @@ public static Vector2i GetGasChunkIndices(Vector2i indices)
+             [ViewVariables]
+             public readonly byte[] Opacity;
+ 
++            [ViewVariables]
++            public readonly byte FireType;
++
+             /// <summary>
+             /// This temperature is currently only used by the GasTileHeatOverlay.
+             /// This value will only reflect the true temperature of the gas when the temperature is between
+@@ -132,9 +135,10 @@ public static Vector2i GetGasChunkIndices(Vector2i indices)
+ 
+             // TODO change fire color based on temps
+ 
+-            public GasOverlayData(byte fireState, byte[] opacity, float temperature)
++            public GasOverlayData(byte fireState, byte type, byte[] opacity, float temperature)
+             {
+                 FireState = fireState;
++                FireType = type;
+                 Opacity = opacity;
+                 Temperature = temperature;
+             }
+diff --git a/Content.Server/Atmos/TileFireEvent.cs b/Content.Shared/Atmos/TileFireEvent.cs
+similarity index 92%
+rename from Content.Server/Atmos/TileFireEvent.cs
+rename to Content.Shared/Atmos/TileFireEvent.cs
+index 5dad4e8fc0..44b0ee7ac3 100644
+--- a/Content.Server/Atmos/TileFireEvent.cs
++++ b/Content.Shared/Atmos/TileFireEvent.cs
+@@ -1,4 +1,4 @@
+-﻿namespace Content.Server.Atmos
++﻿namespace Content.Shared.Atmos
+ {
+     /// <summary>
+     ///     Event raised directed to an entity when it is standing on a tile that's on fire.
+diff --git a/Content.Shared/Chemistry/Components/Solution.cs b/Content.Shared/Chemistry/Components/Solution.cs
+index 38be03226d..e8c9f5ce44 100644
+--- a/Content.Shared/Chemistry/Components/Solution.cs
++++ b/Content.Shared/Chemistry/Components/Solution.cs
+@@ -922,6 +922,33 @@ public Color GetColorWithOnly(IPrototypeManager? protoMan, params string[] inclu
+             return mixColor;
+         }
+ 
++        public int GetSolutionFlammability(IPrototypeManager? protoMan)
++        {
++            IoCManager.Resolve(ref protoMan);
++            float solutionFlammability = 0;
++            foreach (var (reagent, quantity) in Contents)
++            {
++                solutionFlammability += protoMan.Index<ReagentPrototype>(reagent.Prototype).Flammability * (float)quantity;
++            }
++            return (int)MathF.Floor(solutionFlammability);
++        }
++
++        public void BurnFlammableReagents(float fraction, IPrototypeManager? protoMan)
++        {
++            IoCManager.Resolve(ref protoMan);
++            var newSoln = new Solution(this);
++            foreach (var (reagent, quantity) in Contents)
++            {
++                var quantityToBurn = Math.Ceiling(((float)quantity *
++                                                   (fraction * protoMan.Index<ReagentPrototype>(reagent.Prototype)
++                                                       .Flammability)) / 0.5) * 0.5; // Ceiling to nearest 0.5u
++                newSoln.RemoveReagent(reagent, quantityToBurn);
++            }
++            Contents = newSoln.Contents;
++            DebugTools.Assert(Volume >= newSoln.Volume);
++            Volume = newSoln.Volume;
++        }
++
+         #region Enumeration
+ 
+         public IEnumerator<ReagentQuantity> GetEnumerator()
+diff --git a/Content.Shared/Chemistry/EntitySystems/SharedSolutionContainerSystem.cs b/Content.Shared/Chemistry/EntitySystems/SharedSolutionContainerSystem.cs
+index 54210cf195..8277c3eebc 100644
+--- a/Content.Shared/Chemistry/EntitySystems/SharedSolutionContainerSystem.cs
++++ b/Content.Shared/Chemistry/EntitySystems/SharedSolutionContainerSystem.cs
+@@ -677,6 +677,15 @@ public bool TryMixAndOverflow(Entity<SolutionComponent> soln, Solution toAdd, Fi
+         return true;
+     }
+ 
++    public void BurnFlammableReagents(Entity<SolutionComponent> soln, float fraction)
++    {
++        var (uid, comp) = soln;
++        var solution = comp.Solution;
++
++        solution.BurnFlammableReagents(fraction, PrototypeManager);
++        UpdateChemicals(soln);
++    }
++
+     /// <summary>
+     ///     Removes an amount from all reagents in a solution, adding it to a new solution.
+     /// </summary>
+diff --git a/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs b/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
+index 4224fa4bc7..0b0271dc9c 100644
+--- a/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
++++ b/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
+@@ -151,6 +151,12 @@ public sealed partial class ReagentPrototype : IPrototype, IInheritingPrototype
+         [DataField]
+         public bool WorksOnTheDead;
+ 
++        /// <summary>
++        /// How likely is this reagent to set on fire?
++        /// </summary>
++        [DataField]
++        public int Flammability = 0;
++
+         [DataField]
+         public FrozenDictionary<ProtoId<MetabolismGroupPrototype>, ReagentEffectsEntry>? Metabolisms;
+ 
+diff --git a/Content.Shared/Fluids/Components/PuddleComponent.cs b/Content.Shared/Fluids/Components/PuddleComponent.cs
+index 105206fece..b409a464b3 100644
+--- a/Content.Shared/Fluids/Components/PuddleComponent.cs
++++ b/Content.Shared/Fluids/Components/PuddleComponent.cs
+@@ -27,5 +27,6 @@ public sealed partial class PuddleComponent : Component
+ 
+         [ViewVariables]
+         public Entity<SolutionComponent>? Solution;
++
+     }
+ }
+diff --git a/Content.Shared/Fluids/SharedPuddleSystem.cs b/Content.Shared/Fluids/SharedPuddleSystem.cs
+index 2d0fffa37b..1443644b7e 100644
+--- a/Content.Shared/Fluids/SharedPuddleSystem.cs
++++ b/Content.Shared/Fluids/SharedPuddleSystem.cs
+@@ -1,4 +1,5 @@
+ using System.Linq;
++using Content.Shared.Atmos;
+ using Content.Shared.Chemistry.Components;
+ using Content.Shared.Chemistry.EntitySystems;
+ using Content.Shared.Chemistry.Reagent;
+@@ -43,6 +44,7 @@ public override void Initialize()
+         SubscribeLocalEvent<PuddleComponent, GetFootstepSoundEvent>(OnGetFootstepSound);
+         SubscribeLocalEvent<PuddleComponent, ExaminedEvent>(HandlePuddleExamined);
+         SubscribeLocalEvent<PuddleComponent, EntRemovedFromContainerMessage>(OnEntRemoved);
++        SubscribeLocalEvent<PuddleComponent, TileFireEvent>(OnPuddleBurn);
+ 
+         SubscribeLocalEvent<PrototypesReloadedEventArgs>(OnPrototypesReloaded);
+ 
+@@ -205,6 +207,17 @@ public void DoTileReactions(TileRef tileRef, Solution solution)
+         }
+     }
+ 
++    public void OnPuddleBurn(Entity<PuddleComponent> ent, ref TileFireEvent args)
++    {
++        if (!_solutionContainerSystem.ResolveSolution(ent.Owner,
++                ent.Comp.SolutionName,
++                ref ent.Comp.Solution,
++                out var solution))
++            return;
++        _solutionContainerSystem.BurnFlammableReagents(ent.Comp.Solution.Value, 0.05f);
++
++    }
++
+     #region Spill
+     // These methods are in Shared to make it easier to interact with PuddleSystem in Shared code.
+     // Note that they always fail when run on the client, not creating a puddle and returning false.
+diff --git a/Resources/Prototypes/Reagents/Consumable/Drink/alcohol.yml b/Resources/Prototypes/Reagents/Consumable/Drink/alcohol.yml
+index 741108cca1..7b59234298 100644
+--- a/Resources/Prototypes/Reagents/Consumable/Drink/alcohol.yml
++++ b/Resources/Prototypes/Reagents/Consumable/Drink/alcohol.yml
+@@ -15,6 +15,7 @@
+   metamorphicMaxFillLevels: 4
+   metamorphicFillBaseName: fill-
+   metamorphicChangeColor: true
++  flammability: 2
+   metabolisms:
+     Drink:
+       effects:
+@@ -159,6 +160,7 @@
+   color: "#b05b3c"
+   boilingPoint: 78.2
+   meltingPoint: -114.1
++  flammability: 3
+   metabolisms:
+     Alcohol:
+       effects:
+@@ -402,6 +404,7 @@
+   metamorphicMaxFillLevels: 4
+   metamorphicFillBaseName: fill-
+   metamorphicChangeColor: false
++  flammability: 2
+   metabolisms:
+     Drink:
+       effects:
+@@ -426,6 +429,7 @@
+   metamorphicMaxFillLevels: 4
+   metamorphicFillBaseName: fill-
+   metamorphicChangeColor: false
++  flammability: 2
+   metabolisms:
+     Drink:
+       effects:
+@@ -2506,6 +2510,7 @@
+   metamorphicMaxFillLevels: 2
+   metamorphicFillBaseName: fill-
+   metamorphicChangeColor: false
++  flammability: 5
+   metabolisms:
+     Drink:
+       effects:
+diff --git a/Resources/Prototypes/Reagents/Consumable/Drink/base_drink.yml b/Resources/Prototypes/Reagents/Consumable/Drink/base_drink.yml
+index 6c050a6ca6..452e3aa7dc 100644
+--- a/Resources/Prototypes/Reagents/Consumable/Drink/base_drink.yml
++++ b/Resources/Prototypes/Reagents/Consumable/Drink/base_drink.yml
+@@ -48,6 +48,7 @@
+   slipData:
+     requiredSlipSpeed: 3.5
+   friction: 0.4
++  flammability: 1
+   metabolisms:
+     Drink:
+       effects:
+diff --git a/Resources/Prototypes/Reagents/Consumable/Food/ingredients.yml b/Resources/Prototypes/Reagents/Consumable/Food/ingredients.yml
+index 6e4114cecf..6e3ce2241d 100644
+--- a/Resources/Prototypes/Reagents/Consumable/Food/ingredients.yml
++++ b/Resources/Prototypes/Reagents/Consumable/Food/ingredients.yml
+@@ -196,6 +196,7 @@
+   color: "#b67823"
+   boilingPoint: 300.0
+   meltingPoint: -16.0
++  flammability: 2
+   tileReactions:
+   - !type:FlammableTileReaction {}
+ 
+diff --git a/Resources/Prototypes/Reagents/chemicals.yml b/Resources/Prototypes/Reagents/chemicals.yml
+index 11945d1dc9..05cea207fa 100644
+--- a/Resources/Prototypes/Reagents/chemicals.yml
++++ b/Resources/Prototypes/Reagents/chemicals.yml
+@@ -7,6 +7,7 @@
+   color: "#AF14B7"
+   boilingPoint: 55.5
+   meltingPoint: -50.0
++  flammability: 4
+ 
+ - type: reagent
+   id: Phenol
+diff --git a/Resources/Prototypes/Reagents/elements.yml b/Resources/Prototypes/Reagents/elements.yml
+index 8d317102c1..a16af13173 100644
+--- a/Resources/Prototypes/Reagents/elements.yml
++++ b/Resources/Prototypes/Reagents/elements.yml
+@@ -126,6 +126,7 @@
+   color: "#cccccc"
+   boilingPoint: -253.0
+   meltingPoint: -259.2
++  flammability: 5
+ 
+ - type: reagent
+   id: Iodine
+diff --git a/Resources/Prototypes/Reagents/gases.yml b/Resources/Prototypes/Reagents/gases.yml
+index 4a97cb8b16..d3c1c2a500 100644
+--- a/Resources/Prototypes/Reagents/gases.yml
++++ b/Resources/Prototypes/Reagents/gases.yml
+@@ -7,6 +7,7 @@
+   color: "#c4f5ff"
+   boilingPoint: -183.0
+   meltingPoint: -218.4
++  flammability: 3
+   metabolisms:
+     Poison:
+       effects:
+@@ -111,6 +112,7 @@
+   recognizable: true
+   boilingPoint: -127.3 # Random values picked between the actual values for CO2 and O2
+   meltingPoint: -186.4
++  flammability: 4
+   tileReactions:
+   - !type:FlammableTileReaction
+     temperatureMultiplier: 1.5
+@@ -154,6 +156,7 @@
+   physicalDesc: reagent-physical-desc-ionizing
+   flavor: bitter
+   color: "#66ff33"
++  flammability: 5
+   tileReactions:
+   - !type:FlammableTileReaction
+     temperatureMultiplier: 2.0
+diff --git a/Resources/Prototypes/Reagents/pyrotechnic.yml b/Resources/Prototypes/Reagents/pyrotechnic.yml
+index 510cf8aa93..9fbb228fca 100644
+--- a/Resources/Prototypes/Reagents/pyrotechnic.yml
++++ b/Resources/Prototypes/Reagents/pyrotechnic.yml
+@@ -43,6 +43,7 @@
+   physicalDesc: reagent-physical-desc-soapy
+   flavor: bitter
+   color: "#FA00AF"
++  flammability: 5
+   tileReactions:
+   - !type:FlammableTileReaction
+     temperatureMultiplier: 5
+@@ -158,6 +159,7 @@
+   boilingPoint: -84.7 # Acetylene. Close enough.
+   meltingPoint: -80.7
+   friction: 0.4
++  flammability: 2
+   tileReactions:
+   - !type:FlammableTileReaction {}
+   metabolisms:
+diff --git a/Resources/Textures/Effects/fire.rsi/4.png b/Resources/Textures/Effects/fire.rsi/4.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d14a5efeaa505c870071c803ab7e03338e337d4f
+GIT binary patch
+literal 2144
+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
+Z=I^ymy_?A4&cMLH;OXk;vd$@?2>{>a96kU5
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Effects/fire.rsi/5.png b/Resources/Textures/Effects/fire.rsi/5.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9d2f8a7f882ddba5a00353cbf4ba390f0dff192
+GIT binary patch
+literal 2165
+zcmeAS@N?(olHy`uVBq!ia0y~yU~m9o4mJh`hE<t`_ZS!$I14-?iy0XBj({-ZRBb+K
+z1_lmwPZ!6KiaBqi?)pi)i_AM{<|10=r80Xqo1VkAkd@({OYf;ZvE|~w_)T+G+*bYz
+zPk3+re)MEr&`IV5$0ZBy-SAkb8Yq4H!ONP>)yLA))61?mL{9qRap0Yi@%^83=NB*2
+zl6iGEKIrY<g<Iao-wS$cf6ue9_sJ)RE%o`HrExy{|9`!k`}O7b`sKG@{*(2umk<3c
+zr4cx%rf0X0_`(Sv-kA&CGYwka@Tnt+s~~U*v%~py-#*@ZzfbtHf{@)354}C-e?_`^
+zXfAlXW544(4Q-3M4?GWdCVk-hFo9un732Hcw^nsNexCj<T0_VAP<rosUPh*X$t%_;
+zF0k%nJN#i{)S726cYhS~m+&y0EyOY3_<l`*=<mrYbxt1qc3<;zLyzp^XkmDNfc3eL
+z$4Mt=dksm(hqqr{)6K4}iKq>^oUqID4&U3^vl<`2t4ur?`^ROm<i}`!?Q0w{iA#F4
+z*c7iD9{9EMXF&9yn-RxLosWMFxNzX_-NGi$Ke7RLj^|$3w)FS^pFh?{?Aosq)t~pW
+z?)@6k3s<(f$o+Gumfs^_udqk_sCt&spB8qG#Ybnoc&Ye+^V*}d4+~k3JP>3S{#z%v
+z(?y3Zl6k+>>x;+F*RSbrR##TGxpnpW5{Zry3x^*zHOY>i^XxY=i63NNA7FR<dDMy^
+z569O9vdOU-f!s2j`!rt7*X-_$Kfdeo>&qJ}_Z9D6_Skq6&lbJ}fdkeX9cEj1?|SQ!
+z^CpCsnce@~8li->m5<G@X*<?DW@LVwH))Hqa<2aU&_(-t`Jx^d9pvF~kj$=K8o1d<
+z*1q2<IdJ!#g?aABULIY2=-_$fjXQ(qaw#r*eBkQZson?H-;xaWw~BaoL3mdDy?J^9
+z?Ntn?7j$l2^`iXz8f(M+Iop!&GnD=KawbaPze0?>UCVP5{~GO7c4NKh;};z@#Egrq
+zUVMsG{Pk<;*+(~0nOL^V8E~iP`dj|<KK5qM$F)o+V%NC7bI*QVkgu_?<M=l3XZH*Y
+zIpih&YRoxM=zaY8gP##k0waHfF_!5IG?(14X57XtV{jrVjp<VV?AxXnZ}dIdD(?Tp
+z&Rc~q!ADa3D7)han?G0l1dO$GJ(c8oVm80v^xkC0?*Do1`Of#uX-CzM7OsB&aJfi>
+zq$tlEn-!Wi!8xs4&OhhX$xNHcwL>Oy`H8}*Jb@zdo9YxlJxrHtH&425c_r$LoXMk#
+zVs(XodDCT|@8me!#GiGHO`*uJ_Q$=)25INczFnzykYk32jLD3rOPTq^OZFx-_lgU>
+zSoI-Rar1|@OlKA*J90_R-%{~L!1xFMQOU%evtJ+ECA8e#=wX)t$AUXddd;a1{l7EL
+zTdb5hv;5mpr5Tf|wg<+$U(mW3aoK0jBsSLb%oE@LOMR$rb0Brmi#7bO%H7kxdu$Ag
+z4`12L9=Q9#j_Zx{XE4`zX-qnC<3hXan}Zimyis6Wqr2&2scZf9=&-l9Hu!WXPER|l
+z@buyQJ(9CGH}l(@YeuywE<Jbl07Jgrnin&y%`>;`o&Qf%yR`P!<?{hfw{PaPZ#dF3
+zrPaSh;NwH}XABMBzxdx4?`Kq9@b~oc=V7~#pPw{y{^ZLZzo*=td35dP4bDH7DQ5F3
+zw|v-pTH*YmNl8mSM6*9Hnsd@p?NUJArIur-g|Dca_!aMqiRX}K@z3b$y79ks*2;6f
+z-HRDbZdGm3VB4*{I97FL0{^7t+5&5`gDgG<PAe)naj0Y6h91$*?4WO2$I}CM*XIZB
+z{Jf)EKl$O?|F5_D{JEmy@!Ly-(d5ErZM6;8t}WVjL`A5_Lw5#me`jHT#va{Ci}r69
+zzY@OJGl28jCdNM^M{mCquzRl9GM|g_&-VYfPb^uqh;iA0)8&(;@0q)wN?Rd%`q~VU
+z5TE7i7g;iTp1i)lr+BJ@(MR=fKhFxDnR`tAwJ?9>kCg%&cK)C7D%)fET=h#jm-gsz
+z++Wn@xniSnC`0%$*&VAJmbT7K*6X@|;l6+WrBlpy{Eaq$N>Vk_n54TyufJ7!?)-kk
+zuJmu#stUd08U`_*B}ao=mn?}~H*d~O<;~XG@tphGIpjGn?&v<q|Bg8z;>CNuqeez6
+zxozGpjmwX8b5kqNDR6Dbd2>KjdrhS2=KG<KoDIJ+?DJiJ{O=wvj~&mtCu(?!zYSNb
+zTR3-t_jJv&xVC4F)|;91Hia&&o1XY@(T>O;>i2b4AL4qz^MvzJSjT#=A4<t*itH1f
+zwr}6`A(5j#P}=39%IjM_{y#44P`_WdC`|7E<lVOWzWrvjQ+mj&`G1D(^CeTm=ks&c
+zul>%viDhBq3LRgUm70I{=G5L(|FQKRKL_XimJ8L+kHbE%IWOIIYM;DA)8wPGMP6^5
+z*2|X3TzK^B&r9#wFEE76SMSt(_B?j}e!=g|4#z*rGFttwH~G%|;q;C;&#ynFEA1ax
+zz5bl~_<y~9gIvvYX~#6pnaQ>H+T&mSWjNQccKuPFmb}8<f1}pu9nY?D4SKZnKEDU2
+z{-x-c=_lUask`$v#(eL^@60Q%+==M7Kl1dQjrbGQEROSc4L7b7I{M<+9e#tZf_3Kv
+zBKto!?7pVZTGUvec6_4=_kXuL{0m+i=?UlMw7mKp(aqjtnKYrLUjIG&huJCb|Ndpr
+z50=0Em%(qL$&~jx^)r9faO}SFn=#VT;{NvTYtL&nH(q+j{v<GDW-F81$<TzhUwdAj
+zzoV}&Z*g?ruiuPYek~C(*xF#^RNVOT=c2DaHQkEtn0)*5p8dkB$6py%onIZnIp^c)
+zYtMgH=uNG&KQL*If32N&g<{@`zYG`ly!z~-5!ZGoVcw6O-<fp`x2@Y`=YOVUo3s46
+zzYP3|E3?*|45|Isyhq-^yLMmBpZ<S!2kMvJO%OY$9r%)gfq}u()z4*}Q$iB}H_tH(
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Effects/fire.rsi/6.png b/Resources/Textures/Effects/fire.rsi/6.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5c34bf708f35184ceb63432b5eae4fd879bd24a
+GIT binary patch
+literal 3546
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/Resources/Textures/Effects/fire.rsi/meta.json b/Resources/Textures/Effects/fire.rsi/meta.json
+index 383478c76d..78094a61fe 100644
+--- a/Resources/Textures/Effects/fire.rsi/meta.json
++++ b/Resources/Textures/Effects/fire.rsi/meta.json
+@@ -1 +1,248 @@
+-{"version": 1, "size": {"x": 32, "y": 32}, "license": "CC-BY-SA-3.0", "copyright": "Taken from https://github.com/tgstation/tgstation at 04e43d8c1d5097fdb697addd4395fb849dd341bd", "states": [{"name": "1", "directions": 4, "delays": [[0.1, 0.2, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.1, 0.1, 0.1]]}, {"name": "2", "directions": 4, "delays": [[0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]]}, {"name": "3", "directions": 4, "delays": [[0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]]}, {"name": "fire", "delays": [[0.1, 0.1, 0.1]]}, {"name": "overcharged", "delays": [[0.1, 0.1, 5.0, 0.1, 0.1, 0.1, 2.0, 0.1, 4.0]]}]}
+\ No newline at end of file
++{
++    "version": 1,
++    "size": {
++        "x": 32,
++        "y": 32
++    },
++    "license": "CC-BY-SA-3.0",
++    "copyright": "Taken from https://github.com/tgstation/tgstation at 04e43d8c1d5097fdb697addd4395fb849dd341bd | sprites 4, 5, and 6 taken from cmss13 at https://github.com/cmss13-devs/cmss13/blob/ce01adda18ccca3bb0105615391861567c766330/icons/effects/fire.dmi",
++    "states": [
++        {
++            "name": "1",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "2",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "3",
++            "directions": 4,
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ],
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "fire",
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    0.1
++                ]
++            ]
++        },
++        {
++            "name": "overcharged",
++            "delays": [
++                [
++                    0.1,
++                    0.1,
++                    5.0,
++                    0.1,
++                    0.1,
++                    0.1,
++                    2.0,
++                    0.1,
++                    4.0
++                ]
++            ]
++        },
++        {
++            "name": "4",
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2
++                ]
++            ]
++        },
++        {
++            "name": "5",
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2
++                ]
++            ]
++        },
++        {
++            "name": "6",
++            "delays": [
++                [
++                    0.1,
++                    0.2,
++                    0.1,
++                    0.2
++                ]
++            ]
++        }
++    ]
++}

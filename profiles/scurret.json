@@ -1,0 +1,8 @@
+{
+    "fork_id": "scurret",
+    "patches": [
+        "base/*.json",
+        "std/31653.json",
+        "std/39684.json"
+    ]
+}

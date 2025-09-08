@@ -9,9 +9,8 @@ PUBLISH_TOKEN = os.environ["PUBLISH_TOKEN"]
 RELEASE_DIR = "release"
 
 ROBUST_CDN_URL = "https://robust.skye.vg/"
-FORK_ID = "vulpture"
 
-def publish(version: str, engine_version: str):
+def publish(version: str, engine_version: str, fork_id: str):
     session = requests.Session()
     session.headers = {
         "Authorization": f"Bearer {PUBLISH_TOKEN}",
@@ -26,7 +25,7 @@ def publish(version: str, engine_version: str):
     headers = {
         "Content-Type": "application/json"
     }
-    resp = session.post(f"{ROBUST_CDN_URL}fork/{FORK_ID}/publish/start", json=data, headers=headers)
+    resp = session.post(f"{ROBUST_CDN_URL}fork/{fork_id}/publish/start", json=data, headers=headers)
     resp.raise_for_status()
     print("Publish successfully started, adding files...")
 
@@ -38,7 +37,7 @@ def publish(version: str, engine_version: str):
                 "Robust-Cdn-Publish-File": os.path.basename(file),
                 "Robust-Cdn-Publish-Version": version
             }
-            resp = session.post(f"{ROBUST_CDN_URL}fork/{FORK_ID}/publish/file", data=f, headers=headers)
+            resp = session.post(f"{ROBUST_CDN_URL}fork/{fork_id}/publish/file", data=f, headers=headers)
 
         resp.raise_for_status()
 
@@ -50,7 +49,7 @@ def publish(version: str, engine_version: str):
     headers = {
         "Content-Type": "application/json"
     }
-    resp = session.post(f"{ROBUST_CDN_URL}fork/{FORK_ID}/publish/finish", json=data, headers=headers)
+    resp = session.post(f"{ROBUST_CDN_URL}fork/{fork_id}/publish/finish", json=data, headers=headers)
     resp.raise_for_status()
 
     print("SUCCESS!")

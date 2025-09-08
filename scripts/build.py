@@ -1,3 +1,4 @@
+import itertools
 import subprocess
 import glob
 import shutil
@@ -30,30 +31,41 @@ def get_vulpture_version() -> str:
 def get_version() -> str:
     return get_vulpture_version() + "-orig-" + get_ss14_version()
 
-changelog = {"Order": -1, "Entries": []}
+for profile in glob.glob("profiles/*.json"):
+    profileid = profile[9:-5]
+    with open(profile) as f:
+        profilemeta = json.load(f)
+        changelog = {"Order": -1, "Entries": []}
 
-for patch in glob.glob("patches/*.json"):
-    patchid = patch[8:-5]
-    with open(patch) as f:
-        patchmeta = json.load(f)
-        if "changelog" in patchmeta:
-            changelog["Entries"].append(patchmeta["changelog"])
-        subprocess.run(["git", "apply", "--3way", f"../patches/{patchid}.patch"], cwd="src", check=True)
-        print(f"applied patch {patchid}")
+        for patch in itertools.chain(*map(glob.glob, profilemeta["patches"])):
+            patchid = patch[8:-5]
+            with open(patch) as f:
+                patchmeta = json.load(f)
+                if "changelog" in patchmeta:
+                    changelog["Entries"].append(patchmeta["changelog"])
+                subprocess.run(["git", "apply", "--3way", f"../patches/{patchid}.patch"], cwd="src", check=True)
+                print(f"applied patch {patchid}")
 
-if len(changelog["Entries"]) > 0:
-    subprocess.run(["git", "apply", "../scripts/changelog.patch"], cwd="src", check=True)
-    with open("src/Resources/Changelog/Patches.yml", "w") as cl:
-        json.dump(changelog, cl)
+        if len(changelog["Entries"]) > 0:
+            subprocess.run(["git", "apply", "../scripts/changelog.patch"], cwd="src", check=True)
+            with open("src/Resources/Changelog/Patches.yml", "w") as cl:
+                json.dump(changelog, cl)
 
-subprocess.run(["dotnet", "restore"], cwd="src", check=True)
-subprocess.run(["dotnet", "build", "Content.Packaging", "--configuration", "Release", "--no-restore", "/m"], cwd="src", check=True)
-# subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--hybrid-acz", "--platform", "linux-x64"], cwd="src", check=True)
-subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--platform", "win-x64", "--platform", "win-arm64", "--platform", "linux-x64", "--platform", "linux-arm64", "--platform", "osx-x64", "--platform", "osx-arm64"], cwd="src", check=True)
-subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "client", "--no-wipe-release"], cwd="src", check=True)
-shutil.move("src/release", "release")
-
-if "PUBLISH_TOKEN" in os.environ:
-    import publish_multi_request
-    publish_multi_request.publish(get_version(), get_engine_version())
+        subprocess.run(["dotnet", "restore"], cwd="src", check=True)
+        subprocess.run(["dotnet", "build", "Content.Packaging", "--configuration", "Release", "--no-restore", "/m"], cwd="src", check=True)
+        # subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--hybrid-acz", "--platform", "linux-x64"], cwd="src", check=True)
+        subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--platform", "win-x64", "--platform", "win-arm64", "--platform", "linux-x64", "--platform", "linux-arm64", "--platform", "osx-x64", "--platform", "osx-arm64"], cwd="src", check=True)
+        subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "client", "--no-wipe-release"], cwd="src", check=True)
+        
+        if "PUBLISH_TOKEN" in os.environ:
+            shutil.move("src/release", "release")
+            import publish_multi_request
+            publish_multi_request.publish(get_version(), get_engine_version(), profilemeta["fork_id"])
+            shutil.rmtree("release")
+        else:
+            os.mkdir("release")
+            shutil.move("src/release", f"release/{profileid}")
+        
+        subprocess.run(["git", "clean", "-ffdx"], cwd="src", check=True)
+        subprocess.run(["git", "checkout", "--", "*"], cwd="src", check=True)
 shutil.rmtree("src")
