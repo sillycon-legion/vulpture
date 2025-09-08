@@ -65,7 +65,8 @@ for profile in glob.glob("profiles/*.json"):
         else:
             os.mkdir("release")
             shutil.move("src/release", f"release/{profileid}")
-        
+
+        subprocess.run(["git", "restore", "--staged", "*"], cwd="src", check=True)
         subprocess.run(["git", "clean", "-ffdx"], cwd="src", check=True)
         subprocess.run(["git", "checkout", "--", "*"], cwd="src", check=True)
 shutil.rmtree("src")
