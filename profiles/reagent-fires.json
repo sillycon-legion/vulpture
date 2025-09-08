@@ -1,9 +1,9 @@
 {
     "fork_id": "reagent-fires",
     "patches": [
-        "base/*.json",
-        "std/31653.json",
-        "std/39684.json",
-        "std/39582.json"
+        "base/*",
+        "std/31653",
+        "std/39684",
+        "std/39582"
     ]
 }
