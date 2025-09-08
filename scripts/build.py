@@ -60,7 +60,7 @@ for profile in glob.glob("profiles/*.json"):
         if "PUBLISH_TOKEN" in os.environ:
             shutil.move("src/release", "release")
             import publish_multi_request
-            publish_multi_request.publish(get_version(), get_engine_version(), profilemeta["fork_id"])
+            publish_multi_request.publish(get_version() + "-profile-" + profilemeta["fork_id"], get_engine_version(), profilemeta["fork_id"])
             shutil.rmtree("release")
         else:
             os.mkdir("release")
