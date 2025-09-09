@@ -31,6 +31,9 @@ def get_vulpture_version() -> str:
 def get_version() -> str:
     return get_vulpture_version() + "-orig-" + get_ss14_version()
 
+if "PUBLISH_TOKEN" not in os.environ:
+    os.mkdir("release")
+
 for profile in glob.glob("profiles/*.json"):
     profileid = profile[9:-5]
     with open(profile) as f:
@@ -56,14 +59,13 @@ for profile in glob.glob("profiles/*.json"):
         # subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--hybrid-acz", "--platform", "linux-x64"], cwd="src", check=True)
         subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "server", "--platform", "win-x64", "--platform", "win-arm64", "--platform", "linux-x64", "--platform", "linux-arm64", "--platform", "osx-x64", "--platform", "osx-arm64"], cwd="src", check=True)
         subprocess.run(["dotnet", "run", "--project", "Content.Packaging", "client", "--no-wipe-release"], cwd="src", check=True)
-        
+
         if "PUBLISH_TOKEN" in os.environ:
             shutil.move("src/release", "release")
             import publish_multi_request
             publish_multi_request.publish(get_version() + "-profile-" + profilemeta["fork_id"], get_engine_version(), profilemeta["fork_id"])
             shutil.rmtree("release")
         else:
-            os.mkdir("release")
             shutil.move("src/release", f"release/{profileid}")
 
         subprocess.run(["git", "restore", "--staged", "*"], cwd="src", check=True)
