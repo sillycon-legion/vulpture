@@ -40,7 +40,7 @@ for profile in glob.glob("profiles/*.json"):
         profilemeta = json.load(f)
         changelog = {"Order": -1, "Entries": []}
 
-        for patch in itertools.chain(*[glob.glob(f"patches/{patch}.json") for patch in profilemeta["patches"]]):
+        for patch in itertools.chain(*[sorted(glob.glob(f"patches/{patch}.json")) for patch in profilemeta["patches"]]):
             patchid = patch[8:-5]
             with open(patch) as f:
                 patchmeta = json.load(f)

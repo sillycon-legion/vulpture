@@ -1,8 +1,5 @@
 # Included patches
 
-By Errant in [#31653](https://github.com/space-wizards/space-station-14/pull/31653):
-- add: The AI Eye can now teleport to any location on the station by Alt-Clicking on the Crew Monitor map.
-
 By VlaDOS1408 in [#34052](https://github.com/space-wizards/space-station-14/pull/34052):
 - tweak: Cargo console UI reworked!
 
@@ -22,9 +19,6 @@ By Quantum-cross in [#36493](https://github.com/space-wizards/space-station-14/p
 - add: You can drag and drop the icons in the lobby to change your job priorities!
 - tweak: Better user feedback (clear tooltips) for the "Ready/Not Ready" button.
 
-By ScarKy0, MilonPL, beck-thompson in [#37539](https://github.com/space-wizards/space-station-14/pull/37539):
-- add: The vulpkanin species can now be selected as a roundstart species.
-
 By ruddygreat in [#38216](https://github.com/space-wizards/space-station-14/pull/38216):
 - add: Added organisational capabilities to the cargo bounty computer.
 
@@ -34,8 +28,11 @@ By yagwog in [#38704](https://github.com/space-wizards/space-station-14/pull/387
 - add: Multiple form fields and signatures can be used in a single document
 - add: [check] to create check boxes on paperwork that can be used to tick, cross or leave blank.
 
-By B_Kirill in [#39684](https://github.com/space-wizards/space-station-14/pull/39684):
-- add: Added camera map. Cutting MAP wire hides camera from map while keeping it accessible in camera list.
-
 By Rinary in [#39790](https://github.com/space-wizards/space-station-14/pull/39790):
 - add: Added mass drivers!
+
+By Errant in [#31653](https://github.com/space-wizards/space-station-14/pull/31653):
+- add: The AI Eye can now teleport to any location on the station by Alt-Clicking on the Crew Monitor map.
+
+By B_Kirill in [#39684](https://github.com/space-wizards/space-station-14/pull/39684):
+- add: Added camera map. Cutting MAP wire hides camera from map while keeping it accessible in camera list.
