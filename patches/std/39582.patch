@@ -199,32 +199,31 @@ index 613fcd14a6..33ad45fa5a 100644
      }
  }
 diff --git a/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs b/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
-index e63a57c3b6..459aa67aa4 100644
+index 4882e93d23..4cfde87411 100644
 --- a/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
 +++ b/Content.Server/Atmos/EntitySystems/GasTileOverlaySystem.cs
-@@ -179,7 +179,7 @@ private byte GetOpacity(float moles, float molesVisible, float molesVisibleMax)
+@@ -175,7 +175,7 @@ private byte GetOpacity(float moles, float molesVisible, float molesVisibleMax)
  
          public GasOverlayData GetOverlayData(GasMixture? mixture)
          {
--            var data = new GasOverlayData(0,
-+            var data = new GasOverlayData(0, 0,
-                 new byte[VisibleGasId.Length],
-                 mixture?.Temperature ?? Atmospherics.TCMB);
+-            var data = new GasOverlayData(0, new byte[VisibleGasId.Length]);
++            var data = new GasOverlayData(0, 0, new byte[VisibleGasId.Length]);
  
-@@ -225,13 +225,13 @@ private bool UpdateChunkTile(GridAtmosphereComponent gridAtmosphere, GasOverlayC
+             for (var i = 0; i < VisibleGasId.Length; i++)
+             {
+@@ -218,12 +218,12 @@ private bool UpdateChunkTile(GridAtmosphereComponent gridAtmosphere, GasOverlayC
              if (oldData.Equals(default))
              {
                  changed = true;
--                oldData = new GasOverlayData(tile.Hotspot.State, new byte[VisibleGasId.Length], temp);
-+                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, new byte[VisibleGasId.Length], temp);
+-                oldData = new GasOverlayData(tile.Hotspot.State, new byte[VisibleGasId.Length]);
++                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, new byte[VisibleGasId.Length]);
              }
--            else if (oldData.FireState != tile.Hotspot.State ||
-+            else if (oldData.FireState != tile.Hotspot.State || oldData.FireType != (byte)tile.Hotspot.Type ||
-                      CheckTemperatureTolerance(oldData.Temperature, temp, _heatDistortionStrengthChangeTolerance))
+-            else if (oldData.FireState != tile.Hotspot.State)
++            else if (oldData.FireState != tile.Hotspot.State || oldData.FireType != (byte)tile.Hotspot.Type)
              {
                  changed = true;
--                oldData = new GasOverlayData(tile.Hotspot.State, oldData.Opacity, temp);
-+                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, oldData.Opacity, temp);
+-                oldData = new GasOverlayData(tile.Hotspot.State, oldData.Opacity);
++                oldData = new GasOverlayData(tile.Hotspot.State, (byte) tile.Hotspot.Type, oldData.Opacity);
              }
  
              if (tile is {Air: not null, NoGridTile: false})
@@ -315,31 +314,28 @@ index 63ee75618c..d55412c966 100644
      {
          if (!TryComp<StepTriggerComponent>(entity, out var comp))
 diff --git a/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs b/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
-index 1c7da938d4..8130aa5f8a 100644
+index 8e7dfdedaf..a00c23d50c 100644
 --- a/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
 +++ b/Content.Shared/Atmos/EntitySystems/SharedGasTileOverlaySystem.cs
-@@ -117,6 +117,9 @@ public static Vector2i GetGasChunkIndices(Vector2i indices)
+@@ -72,13 +72,17 @@ public static Vector2i GetGasChunkIndices(Vector2i indices)
              [ViewVariables]
              public readonly byte[] Opacity;
  
 +            [ViewVariables]
 +            public readonly byte FireType;
 +
-             /// <summary>
-             /// This temperature is currently only used by the GasTileHeatOverlay.
-             /// This value will only reflect the true temperature of the gas when the temperature is between
-@@ -132,9 +135,10 @@ public static Vector2i GetGasChunkIndices(Vector2i indices)
- 
              // TODO change fire color based on temps
+             // But also: dont dirty on a 0.01 kelvin change in temperatures.
+             // Either have a temp tolerance, or map temperature -> byte levels
  
--            public GasOverlayData(byte fireState, byte[] opacity, float temperature)
-+            public GasOverlayData(byte fireState, byte type, byte[] opacity, float temperature)
+-            public GasOverlayData(byte fireState, byte[] opacity)
++            public GasOverlayData(byte fireState, byte type, byte[] opacity)
              {
                  FireState = fireState;
 +                FireType = type;
                  Opacity = opacity;
-                 Temperature = temperature;
              }
+ 
 diff --git a/Content.Server/Atmos/TileFireEvent.cs b/Content.Shared/Atmos/TileFireEvent.cs
 similarity index 92%
 rename from Content.Server/Atmos/TileFireEvent.cs
@@ -412,10 +408,10 @@ index 54210cf195..8277c3eebc 100644
      ///     Removes an amount from all reagents in a solution, adding it to a new solution.
      /// </summary>
 diff --git a/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs b/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
-index 4224fa4bc7..0b0271dc9c 100644
+index b999d8df61..99dbd44390 100644
 --- a/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
 +++ b/Content.Shared/Chemistry/Reagent/ReagentPrototype.cs
-@@ -151,6 +151,12 @@ public sealed partial class ReagentPrototype : IPrototype, IInheritingPrototype
+@@ -172,6 +172,12 @@ public sealed partial class ReagentPrototype : IPrototype, IInheritingPrototype
          [DataField]
          public bool WorksOnTheDead;
  
