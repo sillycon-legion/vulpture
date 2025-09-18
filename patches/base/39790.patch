@@ -1722,14 +1722,13 @@ index 302679c4d9..18e207abf4 100644
 +  description: signal-port-description-mass-driver-console-sender
 +  defaultLinks: [ MassDriverConsoleReceiver ]
 diff --git a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
-index eec282acda..2a31c826a6 100644
+index 0697506855..9f6f2ca268 100644
 --- a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
 +++ b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/Machine/production.yml
-@@ -1349,3 +1349,15 @@
-       Steel: 2
+@@ -1350,6 +1350,18 @@
        Manipulator: 2
        Cable: 1
-+
+ 
 +- type: entity
 +  parent: BaseMachineCircuitboard
 +  id: MassDriverCircuitboard
@@ -1741,8 +1740,12 @@ index eec282acda..2a31c826a6 100644
 +      Steel: 5
 +      Manipulator: 2
 +      Cable: 4
++
+ - type: entity
+   parent: BaseMachineCircuitboard
+   id: SmartFridgeCircuitboard
 diff --git a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
-index 459030d8a9..bc7ec3f313 100644
+index 8c90308417..cc4c822413 100644
 --- a/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
 +++ b/Resources/Prototypes/Entities/Objects/Devices/Circuitboards/computer.yml
 @@ -260,7 +260,7 @@
@@ -1754,11 +1757,10 @@ index 459030d8a9..bc7ec3f313 100644
  - type: entity
    parent: BaseComputerCircuitboard
    id: XenoborgCameraMonitorCircuitboard
-@@ -560,3 +560,16 @@
-       state: cpu_science
+@@ -561,6 +561,19 @@
      - type: ComputerBoard
        prototype: StationAiUploadComputer
-+
+ 
 +- type: entity
 +  parent: BaseComputerCircuitboard
 +  id: MassDriverComputerCircuitboard
@@ -1771,15 +1773,25 @@ index 459030d8a9..bc7ec3f313 100644
 +      prototype: MassDriverComputer
 +    - type: StaticPrice
 +      price: 200
++
+ - type: entity
+   parent: BaseComputerCircuitboard
+   id: StationAiFixerCircuitboard
+@@ -570,4 +583,4 @@
+     - type: Sprite
+       state: cpu_science
+     - type: ComputerBoard
+-      prototype: StationAiFixerComputer
+\ No newline at end of file
++      prototype: StationAiFixerComputer
 diff --git a/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml b/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
-index f6538ba64e..ae45ffe9a0 100644
+index e275bef0e9..8d29f2b509 100644
 --- a/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
 +++ b/Resources/Prototypes/Entities/Structures/Machines/Computers/computers.yml
-@@ -1636,3 +1636,48 @@
-     containers:
+@@ -1637,6 +1637,51 @@
        circuit_holder: !type:ContainerSlot
        board: !type:Container
-+
+ 
 +- type: entity
 +  parent: BaseComputerAiAccess
 +  id: MassDriverComputer
@@ -1824,6 +1836,17 @@ index f6538ba64e..ae45ffe9a0 100644
 +  - type: ContainerContainer
 +    containers:
 +      board: !type:Container
++
+ - type: entity
+   id: StationAiFixerComputer
+   parent: BaseComputer
+@@ -1718,4 +1763,4 @@
+       enum.StationAiFixerConsoleUiKey.Key:
+         type: StationAiFixerConsoleBoundUserInterface
+       enum.WiresUiKey.Key:
+-        type: WiresBoundUserInterface
+\ No newline at end of file
++        type: WiresBoundUserInterface
 diff --git a/Resources/Prototypes/Entities/Structures/Machines/mass_driver.yml b/Resources/Prototypes/Entities/Structures/Machines/mass_driver.yml
 new file mode 100644
 index 0000000000..618166aa97
@@ -1958,10 +1981,10 @@ index 2bf3bb3c34..db8ea52c77 100644
  
  # Science
 diff --git a/Resources/Prototypes/Recipes/Lathes/machine_boards.yml b/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
-index 23eb3bfbb7..9d593b76dd 100644
+index f355e34b28..5d2dc2e68d 100644
 --- a/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
 +++ b/Resources/Prototypes/Recipes/Lathes/machine_boards.yml
-@@ -462,3 +462,8 @@
+@@ -467,3 +467,8 @@
    parent: [ BaseCircuitboardRecipe, BaseGeneralMachineRecipeCategory ]
    id: HolopadMachineCircuitboard
    result: HolopadMachineCircuitboard

@@ -1,0 +1,2358 @@
+diff --git a/Content.Client/Administration/UI/BanPanel/BanPanel.xaml.cs b/Content.Client/Administration/UI/BanPanel/BanPanel.xaml.cs
+index d20c741673..c7aed30c1c 100644
+--- a/Content.Client/Administration/UI/BanPanel/BanPanel.xaml.cs
++++ b/Content.Client/Administration/UI/BanPanel/BanPanel.xaml.cs
+@@ -24,7 +24,7 @@ namespace Content.Client.Administration.UI.BanPanel;
+ [GenerateTypedNameReferences]
+ public sealed partial class BanPanel : DefaultWindow
+ {
+-    public event Action<Ban>? BanSubmitted;
++    public event Action<string?, (IPAddress, int)?, bool, ImmutableTypedHwid?, bool, uint, string, NoteSeverity, string[]?, bool>? BanSubmitted;
+     public event Action<string>? PlayerChanged;
+     private string? PlayerUsername { get; set; }
+     private (IPAddress, int)? IpAddress { get; set; }
+@@ -37,8 +37,8 @@ public sealed partial class BanPanel : DefaultWindow
+     // This is less efficient than just holding a reference to the root control and enumerating children, but you
+     // have to know how the controls are nested, which makes the code more complicated.
+     // Role group name -> the role buttons themselves.
+-    private readonly Dictionary<string, List<(Button, IPrototype)>> _roleCheckboxes = new();
+-    private readonly ISawmill _banPanelSawmill;
++    private readonly Dictionary<string, List<Button>> _roleCheckboxes = new();
++    private readonly ISawmill _banpanelSawmill;
+ 
+     [Dependency] private readonly IGameTiming _gameTiming = default!;
+     [Dependency] private readonly IConfigurationManager _cfg = default!;
+@@ -79,7 +79,7 @@ public BanPanel()
+     {
+         RobustXamlLoader.Load(this);
+         IoCManager.InjectDependencies(this);
+-        _banPanelSawmill = _logManager.GetSawmill("admin.banpanel");
++        _banpanelSawmill = _logManager.GetSawmill("admin.banpanel");
+         PlayerList.OnSelectionChanged += OnPlayerSelectionChanged;
+         PlayerNameLine.OnFocusExit += _ => OnPlayerNameChanged();
+         PlayerCheckbox.OnPressed += _ =>
+@@ -110,7 +110,7 @@ public BanPanel()
+             TypeOption.SelectId(args.Id);
+             OnTypeChanged();
+         };
+-        LastConnCheckbox.OnPressed += _ =>
++        LastConnCheckbox.OnPressed += args =>
+         {
+             IpLine.ModulateSelfOverride = null;
+             HwidLine.ModulateSelfOverride = null;
+@@ -164,7 +164,7 @@ public BanPanel()
+ 
+         var antagRoles = _protoMan.EnumeratePrototypes<AntagPrototype>()
+                                   .OrderBy(x => x.ID);
+-        CreateRoleGroup(AntagPrototype.GroupName, AntagPrototype.GroupColor, antagRoles);
++        CreateRoleGroup("Antagonist", Color.Red, antagRoles);
+     }
+ 
+     /// <summary>
+@@ -236,14 +236,14 @@ private Button CreateRoleGroupHeader(string groupName, BoxContainer header, Colo
+         {
+             foreach (var role in _roleCheckboxes[groupName])
+             {
+-                role.Item1.Pressed = args.Pressed;
++                role.Pressed = args.Pressed;
+             }
+ 
+             if (args.Pressed)
+             {
+                 if (!Enum.TryParse(_cfg.GetCVar(CCVars.DepartmentBanDefaultSeverity), true, out NoteSeverity newSeverity))
+                 {
+-                    _banPanelSawmill
++                    _banpanelSawmill
+                         .Warning("Departmental role ban severity could not be parsed from config!");
+                     return;
+                 }
+@@ -255,14 +255,14 @@ private Button CreateRoleGroupHeader(string groupName, BoxContainer header, Colo
+                 {
+                     foreach (var button in roleButtons)
+                     {
+-                        if (button.Item1.Pressed)
++                        if (button.Pressed)
+                             return;
+                     }
+                 }
+ 
+                 if (!Enum.TryParse(_cfg.GetCVar(CCVars.RoleBanDefaultSeverity), true, out NoteSeverity newSeverity))
+                 {
+-                    _banPanelSawmill
++                    _banpanelSawmill
+                         .Warning("Role ban severity could not be parsed from config!");
+                     return;
+                 }
+@@ -294,7 +294,7 @@ private Button CreateRoleGroupHeader(string groupName, BoxContainer header, Colo
+     }
+ 
+     /// <summary>
+-    /// Adds a check button specifically for one "role" in a "group"
++    /// Adds a checkbutton specifically for one "role" in a "group"
+     /// E.g. it would add the Chief Medical Officer "role" into the "Medical" group.
+     /// </summary>
+     private void AddRoleCheckbox(string group, string role, GridContainer roleGroupInnerContainer, Button roleGroupCheckbox)
+@@ -302,36 +302,23 @@ private void AddRoleCheckbox(string group, string role, GridContainer roleGroupI
+         var roleCheckboxContainer = new BoxContainer();
+         var roleCheckButton = new Button
+         {
+-            Name = role,
++            Name = $"{role}RoleCheckbox",
+             Text = role,
+             ToggleMode = true,
+         };
+         roleCheckButton.OnToggled += args =>
+         {
+             // Checks the role group checkbox if all the children are pressed
+-            if (args.Pressed && _roleCheckboxes[group].All(e => e.Item1.Pressed))
++            if (args.Pressed && _roleCheckboxes[group].All(e => e.Pressed))
+                 roleGroupCheckbox.Pressed = args.Pressed;
+             else
+                 roleGroupCheckbox.Pressed = false;
+         };
+ 
+-        IPrototype rolePrototype;
+-
+-        if (_protoMan.TryIndex<JobPrototype>(role, out var jobPrototype))
+-            rolePrototype = jobPrototype;
+-        else if (_protoMan.TryIndex<AntagPrototype>(role, out var antagPrototype))
+-            rolePrototype = antagPrototype;
+-        else
+-        {
+-            _banPanelSawmill.Error($"Adding a role checkbox for role {role}: role is not a JobPrototype or AntagPrototype.");
+-
+-            return;
+-        }
+-
+         // This is adding the icon before the role name
+         // TODO: This should not be using raw strings for prototypes as it means it won't be validated at all.
+-        // // I know the ban manager is doing the same thing, but that should not leak into UI code.
+-        if (jobPrototype is not null && _protoMan.TryIndex(jobPrototype.Icon, out var iconProto))
++        // I know the ban manager is doing the same thing, but that should not leak into UI code.
++        if (_protoMan.TryIndex<JobPrototype>(role, out var jobPrototype) && _protoMan.Resolve(jobPrototype.Icon, out var iconProto))
+         {
+             var jobIconTexture = new TextureRect
+             {
+@@ -348,7 +335,7 @@ private void AddRoleCheckbox(string group, string role, GridContainer roleGroupI
+         roleGroupInnerContainer.AddChild(roleCheckboxContainer);
+ 
+         _roleCheckboxes.TryAdd(group, []);
+-        _roleCheckboxes[group].Add((roleCheckButton, rolePrototype));
++        _roleCheckboxes[group].Add(roleCheckButton);
+     }
+ 
+     public void UpdateBanFlag(bool newFlag)
+@@ -501,7 +488,7 @@ private void OnTypeChanged()
+                     newSeverity = serverSeverity;
+                 else
+                 {
+-                    _banPanelSawmill
++                    _banpanelSawmill
+                         .Warning("Server ban severity could not be parsed from config!");
+                 }
+ 
+@@ -514,7 +501,7 @@ private void OnTypeChanged()
+                     }
+                     else
+                     {
+-                        _banPanelSawmill
++                        _banpanelSawmill
+                             .Warning("Role ban severity could not be parsed from config!");
+                     }
+                     break;
+@@ -559,51 +546,34 @@ private void ResetTextEditor(GUIBoundKeyEventArgs _)
+ 
+     private void SubmitButtonOnOnPressed(BaseButton.ButtonEventArgs obj)
+     {
+-        ProtoId<JobPrototype>[]? jobs = null;
+-        ProtoId<AntagPrototype>[]? antags = null;
+-
++        string[]? roles = null;
+         if (TypeOption.SelectedId == (int) Types.Role)
+         {
+-            var jobList = new List<ProtoId<JobPrototype>>();
+-            var antagList = new List<ProtoId<AntagPrototype>>();
+-
++            var rolesList = new List<string>();
+             if (_roleCheckboxes.Count == 0)
+                 throw new DebugAssertException("RoleCheckboxes was empty");
+ 
+             foreach (var button in _roleCheckboxes.Values.SelectMany(departmentButtons => departmentButtons))
+             {
+-                if (button.Item1 is { Pressed: true, Name: not null })
++                if (button is { Pressed: true, Text: not null })
+                 {
+-                    switch (button.Item2)
+-                    {
+-                        case JobPrototype:
+-                            jobList.Add(button.Item2.ID);
+-
+-                            break;
+-                        case AntagPrototype:
+-                            antagList.Add(button.Item2.ID);
+-
+-                            break;
+-                    }
++                    rolesList.Add(button.Text);
+                 }
+             }
+ 
+-            if (jobList.Count + antagList.Count == 0)
++            if (rolesList.Count == 0)
+             {
+                 Tabs.CurrentTab = (int) TabNumbers.Roles;
+-
+                 return;
+             }
+ 
+-            jobs = jobList.ToArray();
+-            antags = antagList.ToArray();
++            roles = rolesList.ToArray();
+         }
+ 
+         if (TypeOption.SelectedId == (int) Types.None)
+         {
+             TypeOption.ModulateSelfOverride = Color.Red;
+             Tabs.CurrentTab = (int) TabNumbers.BasicInfo;
+-
+             return;
+         }
+ 
+@@ -615,7 +585,6 @@ private void SubmitButtonOnOnPressed(BaseButton.ButtonEventArgs obj)
+             ReasonTextEdit.GrabKeyboardFocus();
+             ReasonTextEdit.ModulateSelfOverride = Color.Red;
+             ReasonTextEdit.OnKeyBindDown += ResetTextEditor;
+-
+             return;
+         }
+ 
+@@ -624,7 +593,6 @@ private void SubmitButtonOnOnPressed(BaseButton.ButtonEventArgs obj)
+             ButtonResetOn = _gameTiming.CurTime.Add(TimeSpan.FromSeconds(3));
+             SubmitButton.ModulateSelfOverride = Color.Red;
+             SubmitButton.Text = Loc.GetString("ban-panel-confirm");
+-
+             return;
+         }
+ 
+@@ -633,22 +601,7 @@ private void SubmitButtonOnOnPressed(BaseButton.ButtonEventArgs obj)
+         var useLastHwid = HwidCheckbox.Pressed && LastConnCheckbox.Pressed && Hwid is null;
+         var severity = (NoteSeverity) SeverityOption.SelectedId;
+         var erase = EraseCheckbox.Pressed;
+-
+-        var ban = new Ban(
+-            player,
+-            IpAddress,
+-            useLastIp,
+-            Hwid,
+-            useLastHwid,
+-            (uint)(TimeEntered * Multiplier),
+-            reason,
+-            severity,
+-            jobs,
+-            antags,
+-            erase
+-        );
+-
+-        BanSubmitted?.Invoke(ban);
++        BanSubmitted?.Invoke(player, IpAddress, useLastIp, Hwid, useLastHwid, (uint) (TimeEntered * Multiplier), reason, severity, roles, erase);
+     }
+ 
+     protected override void FrameUpdate(FrameEventArgs args)
+diff --git a/Content.Client/Administration/UI/BanPanel/BanPanelEui.cs b/Content.Client/Administration/UI/BanPanel/BanPanelEui.cs
+index ac17576361..940a55e010 100644
+--- a/Content.Client/Administration/UI/BanPanel/BanPanelEui.cs
++++ b/Content.Client/Administration/UI/BanPanel/BanPanelEui.cs
+@@ -14,7 +14,8 @@ public BanPanelEui()
+     {
+         BanPanel = new BanPanel();
+         BanPanel.OnClose += () => SendMessage(new CloseEuiMessage());
+-        BanPanel.BanSubmitted += ban => SendMessage(new BanPanelEuiStateMsg.CreateBanRequest(ban));
++        BanPanel.BanSubmitted += (player, ip, useLastIp, hwid, useLastHwid, minutes, reason, severity, roles, erase)
++            => SendMessage(new BanPanelEuiStateMsg.CreateBanRequest(player, ip, useLastIp, hwid, useLastHwid, minutes, reason, severity, roles, erase));
+         BanPanel.PlayerChanged += player => SendMessage(new BanPanelEuiStateMsg.GetPlayerInfoRequest(player));
+     }
+ 
+diff --git a/Content.Client/Lobby/UI/HumanoidProfileEditor.xaml.cs b/Content.Client/Lobby/UI/HumanoidProfileEditor.xaml.cs
+index 609b633fe4..dfdfece979 100644
+--- a/Content.Client/Lobby/UI/HumanoidProfileEditor.xaml.cs
++++ b/Content.Client/Lobby/UI/HumanoidProfileEditor.xaml.cs
+@@ -660,10 +660,8 @@ public void RefreshAntags()
+                 selector.Setup(items, title, 250, description, guides: antag.Guides);
+                 selector.Select(Profile?.AntagPreferences.Contains(antag.ID) == true ? 0 : 1);
+ 
+-                if (!_requirements.IsAllowed(
+-                        antag,
+-                        (HumanoidCharacterProfile?)_preferencesManager.Preferences?.SelectedCharacter,
+-                        out var reason))
++                var requirements = _entManager.System<SharedRoleSystem>().GetAntagRequirement(antag);
++                if (!_requirements.CheckRoleRequirements(requirements, (HumanoidCharacterProfile?)_preferencesManager.Preferences?.SelectedCharacter, out var reason))
+                 {
+                     selector.LockRequirements(reason);
+                     Profile = Profile?.WithAntagPreference(antag.ID, false);
+diff --git a/Content.Client/Players/PlayTimeTracking/JobRequirementsManager.cs b/Content.Client/Players/PlayTimeTracking/JobRequirementsManager.cs
+index d085d9005c..314b59eda9 100644
+--- a/Content.Client/Players/PlayTimeTracking/JobRequirementsManager.cs
++++ b/Content.Client/Players/PlayTimeTracking/JobRequirementsManager.cs
+@@ -1,4 +1,5 @@
+ using System.Diagnostics.CodeAnalysis;
++using Content.Client.Lobby;
+ using Content.Shared.CCVar;
+ using Content.Shared.Players;
+ using Content.Shared.Players.JobWhitelist;
+@@ -25,8 +26,7 @@ public sealed class JobRequirementsManager : ISharedPlaytimeManager
+     [Dependency] private readonly IPrototypeManager _prototypes = default!;
+ 
+     private readonly Dictionary<string, TimeSpan> _roles = new();
+-    private readonly List<string> _jobBans = new();
+-    private readonly List<string> _antagBans = new();
++    private readonly List<string> _roleBans = new();
+     private readonly List<string> _jobWhitelists = new();
+ 
+     private ISawmill _sawmill = default!;
+@@ -52,19 +52,16 @@ private void ClientOnRunLevelChanged(object? sender, RunLevelChangedEventArgs e)
+             // Reset on disconnect, just in case.
+             _roles.Clear();
+             _jobWhitelists.Clear();
+-            _jobBans.Clear();
+-            _antagBans.Clear();
++            _roleBans.Clear();
+         }
+     }
+ 
+     private void RxRoleBans(MsgRoleBans message)
+     {
+-        _sawmill.Debug($"Received role ban info: {message.JobBans.Count} job ban entries and {message.AntagBans.Count} antag ban entries.");
++        _sawmill.Debug($"Received roleban info containing {message.Bans.Count} entries.");
+ 
+-        _jobBans.Clear();
+-        _jobBans.AddRange(message.JobBans);
+-        _antagBans.Clear();
+-        _antagBans.AddRange(message.AntagBans);
++        _roleBans.Clear();
++        _roleBans.AddRange(message.Bans);
+         Updated?.Invoke();
+     }
+ 
+@@ -93,97 +90,33 @@ private void RxJobWhitelist(MsgJobWhitelist message)
+         Updated?.Invoke();
+     }
+ 
+-    /// <summary>
+-    /// Check a list of job- and antag prototypes against the current player, for requirements and bans.
+-    /// </summary>
+-    /// <returns>
+-    /// False if any of the prototypes are banned or have unmet requirements.
+-    /// </returns>>
+-    public bool IsAllowed(
+-        List<ProtoId<JobPrototype>>? jobs,
+-        List<ProtoId<AntagPrototype>>? antags,
+-        HumanoidCharacterProfile? profile,
+-        [NotNullWhen(false)] out FormattedMessage? reason)
++    public bool IsAllowed(JobPrototype job, HumanoidCharacterProfile? profile, [NotNullWhen(false)] out FormattedMessage? reason)
+     {
+         reason = null;
+ 
+-        if (antags is not null)
+-        {
+-            foreach (var proto in antags)
+-            {
+-                if (!IsAllowed(_prototypes.Index(proto), profile, out reason))
+-                    return false;
+-            }
+-        }
+-
+-        if (jobs is not null)
+-        {
+-            foreach (var proto in jobs)
+-            {
+-                if (!IsAllowed(_prototypes.Index(proto), profile, out reason))
+-                    return false;
+-            }
+-        }
+-
+-        return true;
+-    }
+-
+-    /// <summary>
+-    /// Check the job prototype against the current player, for requirements and bans
+-    /// </summary>
+-    public bool IsAllowed(
+-        JobPrototype job,
+-        HumanoidCharacterProfile? profile,
+-        [NotNullWhen(false)] out FormattedMessage? reason)
+-    {
+-        // Check the player's bans
+-        if (_jobBans.Contains(job.ID))
++        if (_roleBans.Contains($"Job:{job.ID}"))
+         {
+             reason = FormattedMessage.FromUnformatted(Loc.GetString("role-ban"));
+             return false;
+         }
+ 
+-        // Check whitelist requirements
+         if (!CheckWhitelist(job, out reason))
+             return false;
+ 
+-        // Check other role requirements
+-        var reqs = _entManager.System<SharedRoleSystem>().GetRoleRequirements(job);
+-        if (!CheckRoleRequirements(reqs, profile, out reason))
+-            return false;
++        var player = _playerManager.LocalSession;
++        if (player == null)
++            return true;
+ 
+-        return true;
++        return CheckRoleRequirements(job, profile, out reason);
+     }
+ 
+-    /// <summary>
+-    /// Check the antag prototype against the current player, for requirements and bans
+-    /// </summary>
+-    public bool IsAllowed(
+-        AntagPrototype antag,
+-        HumanoidCharacterProfile? profile,
+-        [NotNullWhen(false)] out FormattedMessage? reason)
++    public bool CheckRoleRequirements(JobPrototype job, HumanoidCharacterProfile? profile, [NotNullWhen(false)] out FormattedMessage? reason)
+     {
+-        // Check the player's bans
+-        if (_antagBans.Contains(antag.ID))
+-        {
+-            reason = FormattedMessage.FromUnformatted(Loc.GetString("role-ban"));
+-            return false;
+-        }
+-
+-        // Check whitelist requirements
+-        if (!CheckWhitelist(antag, out reason))
+-            return false;
+-
+-        // Check other role requirements
+-        var reqs = _entManager.System<SharedRoleSystem>().GetRoleRequirements(antag);
+-        if (!CheckRoleRequirements(reqs, profile, out reason))
+-            return false;
+-
+-        return true;
++        var reqs = _entManager.System<SharedRoleSystem>().GetJobRequirement(job);
++        return CheckRoleRequirements(reqs, profile, out reason);
+     }
+ 
+-    // This must be private so code paths can't accidentally skip requirement overrides. Call this through IsAllowed()
+-    private bool CheckRoleRequirements(HashSet<JobRequirement>? requirements, HumanoidCharacterProfile? profile, [NotNullWhen(false)] out FormattedMessage? reason)
++    public bool CheckRoleRequirements(HashSet<JobRequirement>? requirements, HumanoidCharacterProfile? profile, [NotNullWhen(false)] out FormattedMessage? reason)
+     {
+         reason = null;
+ 
+@@ -218,15 +151,6 @@ public bool CheckWhitelist(JobPrototype job, [NotNullWhen(false)] out FormattedM
+         return true;
+     }
+ 
+-    public bool CheckWhitelist(AntagPrototype antag, [NotNullWhen(false)] out FormattedMessage? reason)
+-    {
+-        reason = default;
+-
+-        // TODO: Implement antag whitelisting.
+-
+-        return true;
+-    }
+-
+     public TimeSpan FetchOverallPlaytime()
+     {
+         return _roles.TryGetValue("Overall", out var overallPlaytime) ? overallPlaytime : TimeSpan.Zero;
+diff --git a/Content.Client/UserInterface/Systems/Ghost/Controls/Roles/GhostRolesEui.cs b/Content.Client/UserInterface/Systems/Ghost/Controls/Roles/GhostRolesEui.cs
+index 86dd6d2092..1cf1e55103 100644
+--- a/Content.Client/UserInterface/Systems/Ghost/Controls/Roles/GhostRolesEui.cs
++++ b/Content.Client/UserInterface/Systems/Ghost/Controls/Roles/GhostRolesEui.cs
+@@ -90,25 +90,23 @@ public override void HandleState(EuiStateBase state)
+             var spriteSystem = sysManager.GetEntitySystem<SpriteSystem>();
+             var requirementsManager = IoCManager.Resolve<JobRequirementsManager>();
+ 
++            // TODO: role.Requirements value doesn't work at all as an equality key, this must be fixed
+             // Grouping roles
+             var groupedRoles = ghostState.GhostRoles.GroupBy(
+-                role => (
+-                    role.Name,
+-                    role.Description,
+-                    //  Check the prototypes for role requirements and bans
+-                    requirementsManager.IsAllowed(role.RolePrototypes.Item1, role.RolePrototypes.Item2, null, out var reason),
+-                    reason));
++                role => (role.Name, role.Description, role.Requirements));
+ 
+             // Add a new entry for each role group
+             foreach (var group in groupedRoles)
+             {
+-                var reason = group.Key.reason;
+                 var name = group.Key.Name;
+                 var description = group.Key.Description;
+-                var prototypesAllowed = group.Key.Item3;
++                var hasAccess = requirementsManager.CheckRoleRequirements(
++                    group.Key.Requirements,
++                    null,
++                    out var reason);
+ 
+                 // Adding a new role
+-                _window.AddEntry(name, description, prototypesAllowed, reason, group, spriteSystem);
++                _window.AddEntry(name, description, hasAccess, reason, group, spriteSystem);
+             }
+ 
+             // Restore the Collapsible box state if it is saved
+diff --git a/Content.Server/Administration/BanPanelEui.cs b/Content.Server/Administration/BanPanelEui.cs
+index 4a4b721872..0a09ad557f 100644
+--- a/Content.Server/Administration/BanPanelEui.cs
++++ b/Content.Server/Administration/BanPanelEui.cs
+@@ -7,7 +7,9 @@
+ using Content.Shared.Administration;
+ using Content.Shared.Database;
+ using Content.Shared.Eui;
++using Content.Shared.Roles;
+ using Robust.Shared.Network;
++using Robust.Shared.Prototypes;
+ 
+ namespace Content.Server.Administration;
+ 
+@@ -19,6 +21,7 @@ public sealed class BanPanelEui : BaseEui
+     [Dependency] private readonly IPlayerLocator _playerLocator = default!;
+     [Dependency] private readonly IChatManager _chat = default!;
+     [Dependency] private readonly IAdminManager _admins = default!;
++    [Dependency] private readonly IPrototypeManager _prototypeManager = default!;
+ 
+     private readonly ISawmill _sawmill;
+ 
+@@ -49,7 +52,7 @@ public override void HandleMessage(EuiMessageBase msg)
+         switch (msg)
+         {
+             case BanPanelEuiStateMsg.CreateBanRequest r:
+-                BanPlayer(r.Ban);
++                BanPlayer(r.Player, r.IpAddress, r.UseLastIp, r.Hwid, r.UseLastHwid, r.Minutes, r.Severity, r.Reason, r.Roles, r.Erase);
+                 break;
+             case BanPanelEuiStateMsg.GetPlayerInfoRequest r:
+                 ChangePlayer(r.PlayerUsername);
+@@ -57,26 +60,29 @@ public override void HandleMessage(EuiMessageBase msg)
+         }
+     }
+ 
+-    private async void BanPlayer(Ban ban)
++    private async void BanPlayer(string? target, string? ipAddressString, bool useLastIp, ImmutableTypedHwid? hwid, bool useLastHwid, uint minutes, NoteSeverity severity, string reason, IReadOnlyCollection<string>? roles, bool erase)
+     {
+         if (!_admins.HasAdminFlag(Player, AdminFlags.Ban))
+         {
+             _sawmill.Warning($"{Player.Name} ({Player.UserId}) tried to create a ban with no ban flag");
+-
+             return;
+         }
+-
+-        if (ban.Target == null && string.IsNullOrWhiteSpace(ban.IpAddress) && ban.Hwid == null)
++        if (target == null && string.IsNullOrWhiteSpace(ipAddressString) && hwid == null)
+         {
+             _chat.DispatchServerMessage(Player, Loc.GetString("ban-panel-no-data"));
+-
+             return;
+         }
+ 
+         (IPAddress, int)? addressRange = null;
+-        if (ban.IpAddress is not null)
++        if (ipAddressString is not null)
+         {
+-            if (!IPAddress.TryParse(ban.IpAddress, out var ipAddress) || !uint.TryParse(ban.IpAddressHid, out var hidInt) || hidInt > Ipv6_CIDR || hidInt > Ipv4_CIDR && ipAddress.AddressFamily == AddressFamily.InterNetwork)
++            var hid = "0";
++            var split = ipAddressString.Split('/', 2);
++            ipAddressString = split[0];
++            if (split.Length > 1)
++                hid = split[1];
++
++            if (!IPAddress.TryParse(ipAddressString, out var ipAddress) || !uint.TryParse(hid, out var hidInt) || hidInt > Ipv6_CIDR || hidInt > Ipv4_CIDR && ipAddress.AddressFamily == AddressFamily.InterNetwork)
+             {
+                 _chat.DispatchServerMessage(Player, Loc.GetString("ban-panel-invalid-ip"));
+                 return;
+@@ -88,12 +94,12 @@ private async void BanPlayer(Ban ban)
+             addressRange = (ipAddress, (int) hidInt);
+         }
+ 
+-        var targetUid = ban.Target is not null ? PlayerId : null;
+-        addressRange = ban.UseLastIp && LastAddress is not null ? (LastAddress, LastAddress.AddressFamily == AddressFamily.InterNetworkV6 ? Ipv6_CIDR : Ipv4_CIDR) : addressRange;
+-        var targetHWid = ban.UseLastHwid ? LastHwid : ban.Hwid;
+-        if (ban.Target != null && ban.Target != PlayerName || Guid.TryParse(ban.Target, out var parsed) && parsed != PlayerId)
++        var targetUid = target is not null ? PlayerId : null;
++        addressRange = useLastIp && LastAddress is not null ? (LastAddress, LastAddress.AddressFamily == AddressFamily.InterNetworkV6 ? Ipv6_CIDR : Ipv4_CIDR) : addressRange;
++        var targetHWid = useLastHwid ? LastHwid : hwid;
++        if (target != null && target != PlayerName || Guid.TryParse(target, out var parsed) && parsed != PlayerId)
+         {
+-            var located = await _playerLocator.LookupIdByNameOrIdAsync(ban.Target);
++            var located = await _playerLocator.LookupIdByNameOrIdAsync(target);
+             if (located == null)
+             {
+                 _chat.DispatchServerMessage(Player, Loc.GetString("cmd-ban-player"));
+@@ -101,7 +107,7 @@ private async void BanPlayer(Ban ban)
+             }
+             targetUid = located.UserId;
+             var targetAddress = located.LastAddress;
+-            if (ban.UseLastIp && targetAddress != null)
++            if (useLastIp && targetAddress != null)
+             {
+                 if (targetAddress.IsIPv4MappedToIPv6)
+                     targetAddress = targetAddress.MapToIPv4();
+@@ -110,50 +116,30 @@ private async void BanPlayer(Ban ban)
+                 var hid = targetAddress.AddressFamily == AddressFamily.InterNetworkV6 ? Ipv6_CIDR : Ipv4_CIDR;
+                 addressRange = (targetAddress, hid);
+             }
+-            targetHWid = ban.UseLastHwid ? located.LastHWId : ban.Hwid;
++            targetHWid = useLastHwid ? located.LastHWId : hwid;
+         }
+ 
+-        if (ban.BannedJobs?.Length > 0 || ban.BannedAntags?.Length > 0)
++        if (roles?.Count > 0)
+         {
+             var now = DateTimeOffset.UtcNow;
+-            foreach (var role in ban.BannedJobs ?? [])
++            foreach (var role in roles)
+             {
+-                _banManager.CreateRoleBan(
+-                    targetUid,
+-                    ban.Target,
+-                    Player.UserId,
+-                    addressRange,
+-                    targetHWid,
+-                    role,
+-                    ban.BanDurationMinutes,
+-                    ban.Severity,
+-                    ban.Reason,
+-                    now
+-                );
+-            }
+-
+-            foreach (var role in ban.BannedAntags ?? [])
+-            {
+-                _banManager.CreateRoleBan(
+-                    targetUid,
+-                    ban.Target,
+-                    Player.UserId,
+-                    addressRange,
+-                    targetHWid,
+-                    role,
+-                    ban.BanDurationMinutes,
+-                    ban.Severity,
+-                    ban.Reason,
+-                    now
+-                );
++                if (_prototypeManager.HasIndex<JobPrototype>(role))
++                {
++                    _banManager.CreateRoleBan(targetUid, target, Player.UserId, addressRange, targetHWid, role, minutes, severity, reason, now);
++                }
++                else
++                {
++                    _sawmill.Warning($"{Player.Name} ({Player.UserId}) tried to issue a job ban with an invalid job: {role}");
++                }
+             }
+ 
+             Close();
+-
+             return;
+         }
+ 
+-        if (ban.Erase && targetUid is not null)
++        if (erase &&
++            targetUid != null)
+         {
+             try
+             {
+@@ -166,16 +152,7 @@ private async void BanPlayer(Ban ban)
+             }
+         }
+ 
+-        _banManager.CreateServerBan(
+-            targetUid,
+-            ban.Target,
+-            Player.UserId,
+-            addressRange,
+-            targetHWid,
+-            ban.BanDurationMinutes,
+-            ban.Severity,
+-            ban.Reason
+-        );
++        _banManager.CreateServerBan(targetUid, target, Player.UserId, addressRange, targetHWid, minutes, severity, reason);
+ 
+         Close();
+     }
+diff --git a/Content.Server/Administration/Commands/RoleBanCommand.cs b/Content.Server/Administration/Commands/RoleBanCommand.cs
+index c49af32881..7058803d2f 100644
+--- a/Content.Server/Administration/Commands/RoleBanCommand.cs
++++ b/Content.Server/Administration/Commands/RoleBanCommand.cs
+@@ -29,10 +29,9 @@ public sealed class RoleBanCommand : IConsoleCommand
+     public async void Execute(IConsoleShell shell, string argStr, string[] args)
+     {
+         string target;
+-        string role;
++        string job;
+         string reason;
+         uint minutes;
+-
+         if (!Enum.TryParse(_cfg.GetCVar(CCVars.RoleBanDefaultSeverity), out NoteSeverity severity))
+         {
+             _sawmill ??= _log.GetSawmill("admin.role_ban");
+@@ -44,33 +43,30 @@ public async void Execute(IConsoleShell shell, string argStr, string[] args)
+         {
+             case 3:
+                 target = args[0];
+-                role = args[1];
++                job = args[1];
+                 reason = args[2];
+                 minutes = 0;
+-
+                 break;
+             case 4:
+                 target = args[0];
+-                role = args[1];
++                job = args[1];
+                 reason = args[2];
+ 
+                 if (!uint.TryParse(args[3], out minutes))
+                 {
+                     shell.WriteError(Loc.GetString("cmd-roleban-minutes-parse", ("time", args[3]), ("help", Help)));
+-
+                     return;
+                 }
+ 
+                 break;
+             case 5:
+                 target = args[0];
+-                role = args[1];
++                job = args[1];
+                 reason = args[2];
+ 
+                 if (!uint.TryParse(args[3], out minutes))
+                 {
+                     shell.WriteError(Loc.GetString("cmd-roleban-minutes-parse", ("time", args[3]), ("help", Help)));
+-
+                     return;
+                 }
+ 
+@@ -84,27 +80,26 @@ public async void Execute(IConsoleShell shell, string argStr, string[] args)
+             default:
+                 shell.WriteError(Loc.GetString("cmd-roleban-arg-count"));
+                 shell.WriteLine(Help);
+-
+                 return;
+         }
+ 
++        if (!_proto.HasIndex<JobPrototype>(job))
++        {
++            shell.WriteError(Loc.GetString("cmd-roleban-job-parse", ("job", job)));
++            return;
++        }
++
+         var located = await _locator.LookupIdByNameOrIdAsync(target);
+         if (located == null)
+         {
+             shell.WriteError(Loc.GetString("cmd-roleban-name-parse"));
+-
+             return;
+         }
+ 
+         var targetUid = located.UserId;
+         var targetHWid = located.LastHWId;
+ 
+-        if (_proto.HasIndex<JobPrototype>(role))
+-            _bans.CreateRoleBan<JobPrototype>(targetUid, located.Username, shell.Player?.UserId, null, targetHWid, role, minutes, severity, reason, DateTimeOffset.UtcNow);
+-        else if (_proto.HasIndex<AntagPrototype>(role))
+-            _bans.CreateRoleBan<AntagPrototype>(targetUid, located.Username, shell.Player?.UserId, null, targetHWid, role, minutes, severity, reason, DateTimeOffset.UtcNow);
+-        else
+-            shell.WriteError(Loc.GetString("cmd-roleban-job-parse", ("job", role)));
++        _bans.CreateRoleBan(targetUid, located.Username, shell.Player?.UserId, null, targetHWid, job, minutes, severity, reason, DateTimeOffset.UtcNow);
+     }
+ 
+     public CompletionResult GetCompletion(IConsoleShell shell, string[] args)
+diff --git a/Content.Server/Administration/Managers/BanManager.cs b/Content.Server/Administration/Managers/BanManager.cs
+index 17f796e699..2d76c434e9 100644
+--- a/Content.Server/Administration/Managers/BanManager.cs
++++ b/Content.Server/Administration/Managers/BanManager.cs
+@@ -26,25 +26,24 @@ namespace Content.Server.Administration.Managers;
+ 
+ public sealed partial class BanManager : IBanManager, IPostInjectInit
+ {
+-    [Dependency] private readonly IConfigurationManager _cfg = default!;
+-    [Dependency] private readonly IChatManager _chat = default!;
+     [Dependency] private readonly IServerDbManager _db = default!;
+-    [Dependency] private readonly ServerDbEntryManager _entryManager = default!;
+-    [Dependency] private readonly IGameTiming _gameTiming = default!;
+-    [Dependency] private readonly ILocalizationManager _localizationManager = default!;
+-    [Dependency] private readonly ILogManager _logManager = default!;
+-    [Dependency] private readonly INetManager _netManager = default!;
+     [Dependency] private readonly IPlayerManager _playerManager = default!;
+     [Dependency] private readonly IPrototypeManager _prototypeManager = default!;
+     [Dependency] private readonly IEntitySystemManager _systems = default!;
++    [Dependency] private readonly IConfigurationManager _cfg = default!;
++    [Dependency] private readonly ILocalizationManager _localizationManager = default!;
++    [Dependency] private readonly ServerDbEntryManager _entryManager = default!;
++    [Dependency] private readonly IChatManager _chat = default!;
++    [Dependency] private readonly INetManager _netManager = default!;
++    [Dependency] private readonly ILogManager _logManager = default!;
++    [Dependency] private readonly IGameTiming _gameTiming = default!;
+     [Dependency] private readonly ITaskManager _taskManager = default!;
+     [Dependency] private readonly UserDbDataManager _userDbData = default!;
+ 
+     private ISawmill _sawmill = default!;
+ 
+     public const string SawmillId = "admin.bans";
+-    public const string PrefixAntag = "Antag:";
+-    public const string PrefixJob = "Job:";
++    public const string JobPrefix = "Job:";
+ 
+     private readonly Dictionary<ICommonSession, List<ServerRoleBanDef>> _cachedRoleBans = new();
+     // Cached ban exemption flags are used to handle
+@@ -92,6 +91,30 @@ private void ClearPlayerData(ICommonSession player)
+         _cachedBanExemptions.Remove(player);
+     }
+ 
++    private async Task<bool> AddRoleBan(ServerRoleBanDef banDef)
++    {
++        banDef = await _db.AddServerRoleBanAsync(banDef);
++
++        if (banDef.UserId != null
++            && _playerManager.TryGetSessionById(banDef.UserId, out var player)
++            && _cachedRoleBans.TryGetValue(player, out var cachedBans))
++        {
++            cachedBans.Add(banDef);
++        }
++
++        return true;
++    }
++
++    public HashSet<string>? GetRoleBans(NetUserId playerUserId)
++    {
++        if (!_playerManager.TryGetSessionById(playerUserId, out var session))
++            return null;
++
++        return _cachedRoleBans.TryGetValue(session, out var roleBans)
++            ? roleBans.Select(banDef => banDef.Role).ToHashSet()
++            : null;
++    }
++
+     public void Restart()
+     {
+         // Clear out players that have disconnected.
+@@ -209,53 +232,22 @@ private void KickForBanDef(ICommonSession player, ServerBanDef def)
+ 
+     #endregion
+ 
+-    #region Role Bans
+-
++    #region Job Bans
+     // If you are trying to remove timeOfBan, please don't. It's there because the note system groups role bans by time, reason and banning admin.
+     // Removing it will clutter the note list. Please also make sure that department bans are applied to roles with the same DateTimeOffset.
+-    public async void CreateRoleBan<T>(
+-        NetUserId? target,
+-        string? targetUsername,
+-        NetUserId? banningAdmin,
+-        (IPAddress, int)? addressRange,
+-        ImmutableTypedHwid? hwid,
+-        ProtoId<T> role,
+-        uint? minutes,
+-        NoteSeverity severity,
+-        string reason,
+-        DateTimeOffset timeOfBan
+-    ) where T : class, IPrototype
++    public async void CreateRoleBan(NetUserId? target, string? targetUsername, NetUserId? banningAdmin, (IPAddress, int)? addressRange, ImmutableTypedHwid? hwid, string role, uint? minutes, NoteSeverity severity, string reason, DateTimeOffset timeOfBan)
+     {
+-        string encodedRole;
+-
+-        // TODO: Note that it's possible to clash IDs here between a job and an antag. The refactor that introduced
+-        // this check has consciously avoided refactoring Job and Antag prototype.
+-        // Refactor Job- and Antag- Prototype to introduce a common RolePrototype, which will fix this possible clash.
+-
+-        //TODO remove this check as part of the above refactor
+-        if (_prototypeManager.HasIndex<JobPrototype>(role) && _prototypeManager.HasIndex<AntagPrototype>(role))
+-        {
+-            _sawmill.Error($"Creating role ban for {role}: cannot create role ban, role is both JobPrototype and AntagPrototype.");
+-
+-            return;
+-        }
+-
+-        // Don't trust the input: make sure the job or antag actually exists.
+-        if (_prototypeManager.HasIndex<JobPrototype>(role))
+-            encodedRole = PrefixJob + role;
+-        else if (_prototypeManager.HasIndex<AntagPrototype>(role))
+-            encodedRole = PrefixAntag + role;
+-        else
++        if (!_prototypeManager.TryIndex(role, out JobPrototype? _))
+         {
+-            _sawmill.Error($"Creating role ban for {role}: cannot create role ban, role is not a JobPrototype or an AntagPrototype.");
+-
+-            return;
++            throw new ArgumentException($"Invalid role '{role}'", nameof(role));
+         }
+ 
++        role = string.Concat(JobPrefix, role);
+         DateTimeOffset? expires = null;
+-
+         if (minutes > 0)
++        {
+             expires = DateTimeOffset.Now + TimeSpan.FromMinutes(minutes.Value);
++        }
+ 
+         _systems.TryGetEntitySystem(out GameTicker? ticker);
+         int? roundId = ticker == null || ticker.RoundId == 0 ? null : ticker.RoundId;
+@@ -274,34 +266,21 @@ DateTimeOffset timeOfBan
+             severity,
+             banningAdmin,
+             null,
+-            encodedRole);
++            role);
+ 
+         if (!await AddRoleBan(banDef))
+         {
+             _chat.SendAdminAlert(Loc.GetString("cmd-roleban-existing", ("target", targetUsername ?? "null"), ("role", role)));
+-
+             return;
+         }
+ 
+         var length = expires == null ? Loc.GetString("cmd-roleban-inf") : Loc.GetString("cmd-roleban-until", ("expires", expires));
+         _chat.SendAdminAlert(Loc.GetString("cmd-roleban-success", ("target", targetUsername ?? "null"), ("role", role), ("reason", reason), ("length", length)));
+ 
+-        if (target is not null && _playerManager.TryGetSessionById(target.Value, out var session))
+-            SendRoleBans(session);
+-    }
+-
+-    private async Task<bool> AddRoleBan(ServerRoleBanDef banDef)
+-    {
+-        banDef = await _db.AddServerRoleBanAsync(banDef);
+-
+-        if (banDef.UserId != null
+-            && _playerManager.TryGetSessionById(banDef.UserId, out var player)
+-            && _cachedRoleBans.TryGetValue(player, out var cachedBans))
++        if (target != null && _playerManager.TryGetSessionById(target.Value, out var session))
+         {
+-            cachedBans.Add(banDef);
++            SendRoleBans(session);
+         }
+-
+-        return true;
+     }
+ 
+     public async Task<string> PardonRoleBan(int banId, NetUserId? unbanningAdmin, DateTimeOffset unbanTime)
+@@ -340,109 +319,32 @@ public async Task<string> PardonRoleBan(int banId, NetUserId? unbanningAdmin, Da
+     }
+ 
+     public HashSet<ProtoId<JobPrototype>>? GetJobBans(NetUserId playerUserId)
+-    {
+-        return GetRoleBans<JobPrototype>(playerUserId, PrefixJob);
+-    }
+-
+-    public HashSet<ProtoId<AntagPrototype>>? GetAntagBans(NetUserId playerUserId)
+-    {
+-        return GetRoleBans<AntagPrototype>(playerUserId, PrefixAntag);
+-    }
+-
+-    private HashSet<ProtoId<T>>? GetRoleBans<T>(NetUserId playerUserId, string prefix) where T : class, IPrototype
+     {
+         if (!_playerManager.TryGetSessionById(playerUserId, out var session))
+             return null;
+ 
+-        return GetRoleBans<T>(session, prefix);
+-    }
+-
+-    private HashSet<ProtoId<T>>? GetRoleBans<T>(ICommonSession playerSession, string prefix) where T : class, IPrototype
+-    {
+-        if (!_cachedRoleBans.TryGetValue(playerSession, out var roleBans))
++        if (!_cachedRoleBans.TryGetValue(session, out var roleBans))
+             return null;
+ 
+         return roleBans
+-            .Where(ban => ban.Role.StartsWith(prefix, StringComparison.Ordinal))
+-            .Select(ban => new ProtoId<T>(ban.Role[prefix.Length..]))
++            .Where(ban => ban.Role.StartsWith(JobPrefix, StringComparison.Ordinal))
++            .Select(ban => new ProtoId<JobPrototype>(ban.Role[JobPrefix.Length..]))
+             .ToHashSet();
+     }
+-
+-    public HashSet<string>? GetRoleBans(NetUserId playerUserId)
+-    {
+-        if (!_playerManager.TryGetSessionById(playerUserId, out var session))
+-            return null;
+-
+-        return _cachedRoleBans.TryGetValue(session, out var roleBans)
+-            ? roleBans.Select(banDef => banDef.Role).ToHashSet()
+-            : null;
+-    }
+-
+-    public bool IsRoleBanned(ICommonSession player, List<ProtoId<JobPrototype>> jobs)
+-    {
+-        return IsRoleBanned(player, jobs, PrefixJob);
+-    }
+-
+-    public bool IsRoleBanned(ICommonSession player, List<ProtoId<AntagPrototype>> antags)
+-    {
+-        return IsRoleBanned(player, antags, PrefixAntag);
+-    }
+-
+-    private bool IsRoleBanned<T>(ICommonSession player, List<ProtoId<T>> roles, string prefix) where T : class, IPrototype
+-    {
+-        var bans = GetRoleBans(player.UserId);
+-
+-        if (bans is null || bans.Count == 0)
+-            return false;
+-
+-        // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
+-        foreach (var role in roles)
+-        {
+-            if (bans.Contains(prefix + role))
+-                return true;
+-        }
+-
+-        return false;
+-    }
++    #endregion
+ 
+     public void SendRoleBans(ICommonSession pSession)
+     {
+-        var jobBans = GetRoleBans<JobPrototype>(pSession, PrefixJob);
+-        var jobBansList = new List<string>(jobBans?.Count ?? 0);
+-
+-        if (jobBans is not null)
+-        {
+-            // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
+-            foreach (var encodedId in jobBans)
+-            {
+-                jobBansList.Add(encodedId.ToString().Replace(PrefixJob, ""));
+-            }
+-        }
+-
+-        var antagBans = GetRoleBans<AntagPrototype>(pSession, PrefixAntag);
+-        var antagBansList = new List<string>(antagBans?.Count ?? 0);
+-
+-        if (antagBans is not null)
+-        {
+-            // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
+-            foreach (var encodedId in antagBans)
+-            {
+-                antagBansList.Add(encodedId.ToString().Replace(PrefixAntag, ""));
+-            }
+-        }
+-
++        var roleBans = _cachedRoleBans.GetValueOrDefault(pSession) ?? new List<ServerRoleBanDef>();
+         var bans = new MsgRoleBans()
+         {
+-            JobBans = jobBansList,
+-            AntagBans = antagBansList,
++            Bans = roleBans.Select(o => o.Role).ToList()
+         };
+ 
+-        _sawmill.Debug($"Sent role bans to {pSession.Name}");
++        _sawmill.Debug($"Sent rolebans to {pSession.Name}");
+         _netManager.ServerSendMessage(bans, pSession.Channel);
+     }
+ 
+-    #endregion
+-
+     public void PostInject()
+     {
+         _sawmill = _logManager.GetSawmill(SawmillId);
+diff --git a/Content.Server/Administration/Managers/IBanManager.cs b/Content.Server/Administration/Managers/IBanManager.cs
+index 1912ebe9ec..fc192cc306 100644
+--- a/Content.Server/Administration/Managers/IBanManager.cs
++++ b/Content.Server/Administration/Managers/IBanManager.cs
+@@ -1,3 +1,4 @@
++using System.Collections.Immutable;
+ using System.Net;
+ using System.Threading.Tasks;
+ using Content.Shared.Database;
+@@ -24,63 +25,19 @@ public interface IBanManager
+     /// <param name="severity">Severity of the resulting ban note</param>
+     /// <param name="reason">Reason for the ban</param>
+     public void CreateServerBan(NetUserId? target, string? targetUsername, NetUserId? banningAdmin, (IPAddress, int)? addressRange, ImmutableTypedHwid? hwid, uint? minutes, NoteSeverity severity, string reason);
+-
+-    /// <summary>
+-    /// Gets a list of prefixed prototype IDs with the player's role bans.
+-    /// </summary>
+     public HashSet<string>? GetRoleBans(NetUserId playerUserId);
+-
+-    /// <summary>
+-    /// Checks if the player is currently banned from any of the listed roles.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="antags">A list of valid antag prototype IDs.</param>
+-    /// <returns>Returns True if an active role ban is found for this player for any of the listed roles.</returns>
+-    public bool IsRoleBanned(ICommonSession player, List<ProtoId<AntagPrototype>> antags);
+-
+-    /// <summary>
+-    /// Checks if the player is currently banned from any of the listed roles.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="jobs">A list of valid job prototype IDs.</param>
+-    /// <returns>Returns True if an active role ban is found for this player for any of the listed roles.</returns>
+-    public bool IsRoleBanned(ICommonSession player, List<ProtoId<JobPrototype>> jobs);
+-
+-    /// <summary>
+-    /// Gets a list of prototype IDs with the player's job bans.
+-    /// </summary>
+     public HashSet<ProtoId<JobPrototype>>? GetJobBans(NetUserId playerUserId);
+ 
+-    /// <summary>
+-    /// Gets a list of prototype IDs with the player's antag bans.
+-    /// </summary>
+-    public HashSet<ProtoId<AntagPrototype>>? GetAntagBans(NetUserId playerUserId);
+-
+     /// <summary>
+     /// Creates a job ban for the specified target, username or GUID
+     /// </summary>
+     /// <param name="target">Target user, username or GUID, null for none</param>
+-    /// <param name="targetUsername">The username of the target, if known</param>
+-    /// <param name="banningAdmin">The responsible admin for the ban</param>
+-    /// <param name="addressRange">The range of IPs that are to be banned, if known</param>
+-    /// <param name="hwid">The HWID to be banned, if known</param>
+-    /// <param name="role">The role ID to be banned from. Either an AntagPrototype or a JobPrototype</param>
+-    /// <param name="minutes">Number of minutes to ban for. 0 and null mean permanent</param>
++    /// <param name="role">Role to be banned from</param>
+     /// <param name="severity">Severity of the resulting ban note</param>
+     /// <param name="reason">Reason for the ban</param>
++    /// <param name="minutes">Number of minutes to ban for. 0 and null mean permanent</param>
+     /// <param name="timeOfBan">Time when the ban was applied, used for grouping role bans</param>
+-    public void CreateRoleBan<T>(
+-        NetUserId? target,
+-        string? targetUsername,
+-        NetUserId? banningAdmin,
+-        (IPAddress, int)? addressRange,
+-        ImmutableTypedHwid? hwid,
+-        ProtoId<T> role,
+-        uint? minutes,
+-        NoteSeverity severity,
+-        string reason,
+-        DateTimeOffset timeOfBan
+-    ) where T : class, IPrototype;
++    public void CreateRoleBan(NetUserId? target, string? targetUsername, NetUserId? banningAdmin, (IPAddress, int)? addressRange, ImmutableTypedHwid? hwid, string role, uint? minutes, NoteSeverity severity, string reason, DateTimeOffset timeOfBan);
+ 
+     /// <summary>
+     /// Pardons a role ban for the specified target, username or GUID
+diff --git a/Content.Server/Antag/AntagSelectionSystem.API.cs b/Content.Server/Antag/AntagSelectionSystem.API.cs
+index 6703b7b7ca..975c802eed 100644
+--- a/Content.Server/Antag/AntagSelectionSystem.API.cs
++++ b/Content.Server/Antag/AntagSelectionSystem.API.cs
+@@ -2,17 +2,16 @@
+ using System.Linq;
+ using Content.Server.Antag.Components;
+ using Content.Server.GameTicking.Rules.Components;
++using Content.Server.Objectives;
+ using Content.Shared.Antag;
+ using Content.Shared.Chat;
+ using Content.Shared.GameTicking.Components;
+ using Content.Shared.Mind;
+ using Content.Shared.Preferences;
+-using Content.Shared.Roles;
+ using JetBrains.Annotations;
+ using Robust.Shared.Audio;
+ using Robust.Shared.Enums;
+ using Robust.Shared.Player;
+-using Robust.Shared.Prototypes;
+ 
+ namespace Content.Server.Antag;
+ 
+@@ -162,35 +161,33 @@ public List<EntityUid> GetAntagMindEntityUids(Entity<AntagSelectionComponent?> e
+     }
+ 
+     /// <summary>
+-    /// Checks if a given session has enabled the antag preferences for a given definition,
+-    /// and if it is blocked by any requirements or bans.
++    /// Checks if a given session has the primary antag preferences for a given definition
+     /// </summary>
+-    /// <returns>Returns true if at least one role from the provided list passes every condition</returns>>
+-    public bool ValidAntagPreference(ICommonSession? session, List<ProtoId<AntagPrototype>> roles)
++    public bool HasPrimaryAntagPreference(ICommonSession? session, AntagSelectionDefinition def)
+     {
+         if (session == null)
+             return true;
+ 
+-        if (roles.Count == 0)
++        if (def.PrefRoles.Count == 0)
+             return false;
+ 
+         var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
++        return pref.AntagPreferences.Any(p => def.PrefRoles.Contains(p));
++    }
+ 
+-        var valid = false;
+-
+-        // Check each individual antag role
+-        foreach (var role in roles)
+-        {
+-            var list = new List<ProtoId<AntagPrototype>>{role};
+-
++    /// <summary>
++    /// Checks if a given session has the fallback antag preferences for a given definition
++    /// </summary>
++    public bool HasFallbackAntagPreference(ICommonSession? session, AntagSelectionDefinition def)
++    {
++        if (session == null)
++            return true;
+ 
+-            if (pref.AntagPreferences.Contains(role)
+-                && !_ban.IsRoleBanned(session, list)
+-                && _playTime.IsAllowed(session, list))
+-                valid = true;
+-        }
++        if (def.FallbackRoles.Count == 0)
++            return false;
+ 
+-        return valid;
++        var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
++        return pref.AntagPreferences.Any(p => def.FallbackRoles.Contains(p));
+     }
+ 
+     /// <summary>
+diff --git a/Content.Server/Antag/AntagSelectionSystem.cs b/Content.Server/Antag/AntagSelectionSystem.cs
+index 2d484a2aa9..7fdf812fbe 100644
+--- a/Content.Server/Antag/AntagSelectionSystem.cs
++++ b/Content.Server/Antag/AntagSelectionSystem.cs
+@@ -1,5 +1,4 @@
+ using System.Linq;
+-using Content.Server.Administration.Managers;
+ using Content.Server.Antag.Components;
+ using Content.Server.Chat.Managers;
+ using Content.Server.GameTicking;
+@@ -9,11 +8,11 @@
+ using Content.Server.Ghost.Roles.Components;
+ using Content.Server.Mind;
+ using Content.Server.Objectives;
+-using Content.Server.Players.PlayTimeTracking;
+ using Content.Server.Preferences.Managers;
+ using Content.Server.Roles;
+ using Content.Server.Roles.Jobs;
+ using Content.Server.Shuttles.Components;
++using Content.Server.Station.Events;
+ using Content.Shared.Administration.Logs;
+ using Content.Shared.Antag;
+ using Content.Shared.Clothing;
+@@ -41,14 +40,12 @@ namespace Content.Server.Antag;
+ public sealed partial class AntagSelectionSystem : GameRuleSystem<AntagSelectionComponent>
+ {
+     [Dependency] private readonly AudioSystem _audio = default!;
+-    [Dependency] private readonly IBanManager _ban = default!;
+     [Dependency] private readonly IChatManager _chat = default!;
+     [Dependency] private readonly GhostRoleSystem _ghostRole = default!;
+     [Dependency] private readonly JobSystem _jobs = default!;
+     [Dependency] private readonly LoadoutSystem _loadout = default!;
+     [Dependency] private readonly MindSystem _mind = default!;
+     [Dependency] private readonly IPlayerManager _playerManager = default!;
+-    [Dependency] private readonly PlayTimeTrackingSystem _playTime = default!;
+     [Dependency] private readonly IServerPreferencesManager _pref = default!;
+     [Dependency] private readonly RoleSystem _role = default!;
+     [Dependency] private readonly TransformSystem _transform = default!;
+@@ -347,7 +344,7 @@ public bool TryMakeAntag(Entity<AntagSelectionComponent> ent, ICommonSession? se
+     {
+         _adminLogger.Add(LogType.AntagSelection, $"Start trying to make {session} become the antagonist: {ToPrettyString(ent)}");
+ 
+-        if (checkPref && !ValidAntagPreference(session, def.PrefRoles))
++        if (checkPref && !HasPrimaryAntagPreference(session, def))
+             return false;
+ 
+         if (!IsSessionValid(ent, session, def) || !IsEntityValid(session?.AttachedEntity, def))
+@@ -500,12 +497,11 @@ public AntagSelectionPlayerPool GetPlayerPool(Entity<AntagSelectionComponent> en
+             if (ent.Comp.PreSelectedSessions.TryGetValue(def, out var preSelected) && preSelected.Contains(session))
+                 continue;
+ 
+-            // Add player to the appropriate antag pool
+-            if (ValidAntagPreference(session, def.PrefRoles))
++            if (HasPrimaryAntagPreference(session, def))
+             {
+                 preferredList.Add(session);
+             }
+-            else if (ValidAntagPreference(session, def.FallbackRoles))
++            else if (HasFallbackAntagPreference(session, def))
+             {
+                 fallbackList.Add(session);
+             }
+diff --git a/Content.Server/Database/ServerDbBase.cs b/Content.Server/Database/ServerDbBase.cs
+index b1e5597894..107e69b38d 100644
+--- a/Content.Server/Database/ServerDbBase.cs
++++ b/Content.Server/Database/ServerDbBase.cs
+@@ -28,6 +28,7 @@ namespace Content.Server.Database
+     public abstract class ServerDbBase
+     {
+         private readonly ISawmill _opsLog;
++
+         public event Action<DatabaseNotification>? OnNotificationReceived;
+ 
+         /// <param name="opsLog">Sawmill to trace log database operations to.</param>
+@@ -1385,7 +1386,7 @@ ban.Unban is null
+                 ban.LastEditedAt,
+                 ban.ExpirationTime,
+                 ban.Hidden,
+-                new [] { ban.RoleId.Replace(BanManager.PrefixJob, null).Replace(BanManager.PrefixAntag, null) },
++                new [] { ban.RoleId.Replace(BanManager.JobPrefix, null) },
+                 MakePlayerRecord(unbanningAdmin),
+                 ban.Unban?.UnbanTime);
+         }
+@@ -1685,7 +1686,7 @@ protected async Task<List<ServerRoleBanNoteRecord>> GetGroupedServerRoleBansAsNo
+                     NormalizeDatabaseTime(firstBan.LastEditedAt),
+                     NormalizeDatabaseTime(firstBan.ExpirationTime),
+                     firstBan.Hidden,
+-                    banGroup.Select(ban => ban.RoleId.Replace(BanManager.PrefixJob, null).Replace(BanManager.PrefixAntag, null)).ToArray(),
++                    banGroup.Select(ban => ban.RoleId.Replace(BanManager.JobPrefix, null)).ToArray(),
+                     MakePlayerRecord(unbanningAdmin),
+                     NormalizeDatabaseTime(firstBan.Unban?.UnbanTime)));
+             }
+diff --git a/Content.Server/GameTicking/Events/IsJobAllowedEvent.cs b/Content.Server/GameTicking/Events/IsJobAllowedEvent.cs
+new file mode 100644
+index 0000000000..51969d61ea
+--- /dev/null
++++ b/Content.Server/GameTicking/Events/IsJobAllowedEvent.cs
+@@ -0,0 +1,13 @@
++﻿using Content.Shared.Roles;
++using Robust.Shared.Player;
++using Robust.Shared.Prototypes;
++
++namespace Content.Server.GameTicking.Events;
++
++[ByRefEvent]
++public struct IsJobAllowedEvent(ICommonSession player, ProtoId<JobPrototype> jobId, bool cancelled = false)
++{
++    public readonly ICommonSession Player = player;
++    public readonly ProtoId<JobPrototype> JobId = jobId;
++    public bool Cancelled = cancelled;
++}
+diff --git a/Content.Server/GameTicking/Events/IsRoleAllowedEvent.cs b/Content.Server/GameTicking/Events/IsRoleAllowedEvent.cs
+deleted file mode 100644
+index 76d2805d1c..0000000000
+--- a/Content.Server/GameTicking/Events/IsRoleAllowedEvent.cs
++++ /dev/null
+@@ -1,24 +0,0 @@
+-﻿using Content.Shared.Roles;
+-using Robust.Shared.Player;
+-using Robust.Shared.Prototypes;
+-
+-namespace Content.Server.GameTicking.Events;
+-
+-/// <summary>
+-///     Event raised to check if a player is allowed/able to assume a role.
+-/// </summary>
+-/// <param name="player">The player.</param>
+-/// <param name="jobs">Optional list of job prototype IDs</param>
+-/// <param name="antags">Optional list of antag prototype IDs</param>
+-[ByRefEvent]
+-public struct IsRoleAllowedEvent(
+-    ICommonSession player,
+-    List<ProtoId<JobPrototype>>? jobs,
+-    List<ProtoId<AntagPrototype>>? antags,
+-    bool cancelled = false)
+-{
+-    public readonly ICommonSession Player = player;
+-    public readonly List<ProtoId<JobPrototype>>? Jobs = jobs;
+-    public readonly List<ProtoId<AntagPrototype>>? Antags = antags;
+-    public bool Cancelled = cancelled;
+-}
+diff --git a/Content.Server/GameTicking/GameTicker.Spawning.cs b/Content.Server/GameTicking/GameTicker.Spawning.cs
+index 2338d4f1fe..194f6c4997 100644
+--- a/Content.Server/GameTicking/GameTicker.Spawning.cs
++++ b/Content.Server/GameTicking/GameTicker.Spawning.cs
+@@ -141,13 +141,12 @@ private void SpawnPlayer(ICommonSession player,
+             var character = GetPlayerProfile(player);
+ 
+             var jobBans = _banManager.GetJobBans(player.UserId);
+-            if (jobBans == null || jobId != null && jobBans.Contains(jobId)) //TODO: use IsRoleBanned directly?
++            if (jobBans == null || jobId != null && jobBans.Contains(jobId))
+                 return;
+ 
+             if (jobId != null)
+             {
+-                var jobs = new List<ProtoId<JobPrototype>> {jobId};
+-                var ev = new IsRoleAllowedEvent(player, jobs, null);
++                var ev = new IsJobAllowedEvent(player, new ProtoId<JobPrototype>(jobId));
+                 RaiseLocalEvent(ref ev);
+                 if (ev.Cancelled)
+                     return;
+diff --git a/Content.Server/Ghost/Roles/Components/GhostRoleComponent.cs b/Content.Server/Ghost/Roles/Components/GhostRoleComponent.cs
+index 98aaf672c2..5dd390bd72 100644
+--- a/Content.Server/Ghost/Roles/Components/GhostRoleComponent.cs
++++ b/Content.Server/Ghost/Roles/Components/GhostRoleComponent.cs
+@@ -15,6 +15,12 @@ public sealed partial class GhostRoleComponent : Component
+ 
+     [DataField("rules")] private string _roleRules = "ghost-role-component-default-rules";
+ 
++    // Actually make use of / enforce this requirement?
++    // Why is this even here.
++    // Move to ghost role prototype & respect CCvars.GameRoleTimerOverride
++    [DataField("requirements")]
++    public HashSet<JobRequirement>? Requirements;
++
+     /// <summary>
+     /// Whether the <see cref="MakeSentientCommand"/> should run on the mob.
+     /// </summary>
+diff --git a/Content.Server/Ghost/Roles/GhostRoleSystem.cs b/Content.Server/Ghost/Roles/GhostRoleSystem.cs
+index b2cbd6a152..182d8e968e 100644
+--- a/Content.Server/Ghost/Roles/GhostRoleSystem.cs
++++ b/Content.Server/Ghost/Roles/GhostRoleSystem.cs
+@@ -1,8 +1,6 @@
+ using System.Linq;
+ using Content.Server.Administration.Logs;
+-using Content.Server.Administration.Managers;
+ using Content.Server.EUI;
+-using Content.Server.GameTicking.Events;
+ using Content.Server.Ghost.Roles.Components;
+ using Content.Server.Ghost.Roles.Events;
+ using Content.Shared.Ghost.Roles.Raffles;
+@@ -34,16 +32,13 @@
+ using Content.Shared.Verbs;
+ using Robust.Shared.Collections;
+ using Content.Shared.Ghost.Roles.Components;
+-using Content.Shared.Roles.Components;
+ 
+ namespace Content.Server.Ghost.Roles;
+ 
+ [UsedImplicitly]
+ public sealed class GhostRoleSystem : EntitySystem
+ {
+-    [Dependency] private readonly IBanManager _ban = default!;
+     [Dependency] private readonly IConfigurationManager _cfg = default!;
+-    [Dependency] private readonly IEntityManager _ent = default!;
+     [Dependency] private readonly EuiManager _euiManager = default!;
+     [Dependency] private readonly IPlayerManager _playerManager = default!;
+     [Dependency] private readonly IAdminLogManager _adminLogger = default!;
+@@ -464,23 +459,6 @@ public void Request(ICommonSession player, uint identifier)
+         if (!_ghostRoles.TryGetValue(identifier, out var roleEnt))
+             return;
+ 
+-        TryPrototypes(roleEnt, out var antags, out var jobs);
+-
+-        // Check role bans
+-        if (_ban.IsRoleBanned(player, antags) || _ban.IsRoleBanned(player, jobs))
+-        {
+-            Log.Warning($"Server rejected ghost role request '{roleEnt.Comp.RoleName}' for '{player.Name}' - client missed ban?");
+-            return;
+-        }
+-
+-        // Check role requirements
+-        if (!IsRoleAllowed(player, jobs, antags))
+-        {
+-            Log.Warning($"Server rejected ghost role request '{roleEnt.Comp.RoleName}' for '{player.Name}' - client missed requirement check?");
+-            return;
+-        }
+-
+-        // Decide to do a raffle or not
+         if (roleEnt.Comp.RaffleConfig is not null)
+         {
+             JoinRaffle(player, identifier);
+@@ -491,78 +469,6 @@ public void Request(ICommonSession player, uint identifier)
+         }
+     }
+ 
+-    /// <summary>
+-    /// Collect all role prototypes on the Ghostrole.
+-    /// </summary>
+-    /// <returns>
+-    /// Returns true if at least on role prototype could be found.
+-    /// </returns>
+-    private bool TryPrototypes(
+-        Entity<GhostRoleComponent> roleEnt,
+-        out List<ProtoId<AntagPrototype>> antags,
+-        out List<ProtoId<JobPrototype>> jobs)
+-    {
+-        antags = [];
+-        jobs = [];
+-
+-        // If there is a mind already, check its mind roles.
+-        // Not sure if this can ever actually happen.
+-        if (TryComp<MindContainerComponent>(roleEnt, out var mindCont)
+-            && TryComp<MindComponent>(mindCont.Mind, out var mind))
+-        {
+-            foreach (var role in mind.MindRoleContainer.ContainedEntities)
+-            {
+-                if(!TryComp<MindRoleComponent>(role, out var comp))
+-                    continue;
+-
+-                if (comp.JobPrototype is not null)
+-                    jobs.Add(comp.JobPrototype.Value);
+-
+-                else if (comp.AntagPrototype is not null)
+-                    antags.Add(comp.AntagPrototype.Value);
+-            }
+-
+-            return antags.Count > 0 || jobs.Count > 0;
+-        }
+-
+-        if (roleEnt.Comp.JobProto is not null)
+-            jobs.Add(roleEnt.Comp.JobProto.Value);
+-
+-
+-        // If there is no mind, check the mindRole prototypes
+-        foreach (var proto in roleEnt.Comp.MindRoles)
+-        {
+-            if (!_prototype.TryIndex(proto, out var indexed)
+-                || !indexed.TryGetComponent<MindRoleComponent>(out var comp, _ent.ComponentFactory))
+-                continue;
+-            var roleComp = (MindRoleComponent)comp;
+-
+-            if (roleComp.JobPrototype is not null)
+-                jobs.Add(roleComp.JobPrototype.Value);
+-            else if (roleComp.AntagPrototype is not null)
+-                antags.Add(roleComp.AntagPrototype.Value);
+-            else
+-                Log.Debug($"Mind role '{proto}' of '{roleEnt.Comp.RoleName}' has neither a job or antag prototype specified");
+-        }
+-
+-        return antags.Count > 0 || jobs.Count > 0;
+-    }
+-
+-    /// <summary>
+-    /// Checks if the player passes the requirements for the supplied roles.
+-    /// Returns false if any role fails the check.
+-    /// </summary>
+-    private bool IsRoleAllowed(
+-        ICommonSession player,
+-        List<ProtoId<JobPrototype>>? jobIds,
+-        List<ProtoId<AntagPrototype>>? antagIds)
+-    {
+-        var ev = new IsRoleAllowedEvent(player, jobIds, antagIds);
+-        RaiseLocalEvent(ref ev);
+-
+-        return !ev.Cancelled;
+-    }
+-
+     /// <summary>
+     /// Attempts having the player take over the ghost role with the corresponding ID. Does not start a raffle.
+     /// </summary>
+@@ -665,15 +571,13 @@ public GhostRoleInfo[] GetGhostRolesInfo(ICommonSession? player)
+                 ? _timing.CurTime.Add(raffle.Countdown)
+                 : TimeSpan.MinValue;
+ 
+-            TryPrototypes((uid, role), out var antags, out var jobs);
+-
+             roles.Add(new GhostRoleInfo
+             {
+                 Identifier = id,
+                 Name = role.RoleName,
+                 Description = role.RoleDescription,
+                 Rules = role.RoleRules,
+-                RolePrototypes = (jobs, antags),
++                Requirements = role.Requirements,
+                 Kind = kind,
+                 RafflePlayerCount = rafflePlayerCount,
+                 RaffleEndTime = raffleEndTime
+diff --git a/Content.Server/Players/JobWhitelist/JobWhitelistManager.cs b/Content.Server/Players/JobWhitelist/JobWhitelistManager.cs
+index c47ffa691f..72f18e00cb 100644
+--- a/Content.Server/Players/JobWhitelist/JobWhitelistManager.cs
++++ b/Content.Server/Players/JobWhitelist/JobWhitelistManager.cs
+@@ -58,9 +58,6 @@ public async void AddWhitelist(NetUserId player, ProtoId<JobPrototype> job)
+             SendJobWhitelist(session);
+     }
+ 
+-    /// <summary>
+-    /// Returns false if role whitelist is required but the player does not have it.
+-    /// </summary>
+     public bool IsAllowed(ICommonSession session, ProtoId<JobPrototype> job)
+     {
+         if (!_config.GetCVar(CCVars.GameRoleWhitelist))
+diff --git a/Content.Server/Players/JobWhitelist/JobWhitelistSystem.cs b/Content.Server/Players/JobWhitelist/JobWhitelistSystem.cs
+index 2e2848fea3..aaada99dea 100644
+--- a/Content.Server/Players/JobWhitelist/JobWhitelistSystem.cs
++++ b/Content.Server/Players/JobWhitelist/JobWhitelistSystem.cs
+@@ -23,7 +23,7 @@ public override void Initialize()
+     {
+         SubscribeLocalEvent<PrototypesReloadedEventArgs>(OnPrototypesReloaded);
+         SubscribeLocalEvent<StationJobsGetCandidatesEvent>(OnStationJobsGetCandidates);
+-        SubscribeLocalEvent<IsRoleAllowedEvent>(OnIsRoleAllowed);
++        SubscribeLocalEvent<IsJobAllowedEvent>(OnIsJobAllowed);
+         SubscribeLocalEvent<GetDisallowedJobsEvent>(OnGetDisallowedJobs);
+ 
+         CacheJobs();
+@@ -51,18 +51,11 @@ private void OnStationJobsGetCandidates(ref StationJobsGetCandidatesEvent ev)
+         }
+     }
+ 
+-    private void OnIsRoleAllowed(ref IsRoleAllowedEvent ev)
++    private void OnIsJobAllowed(ref IsJobAllowedEvent ev)
+     {
+-        if (ev.Jobs is null)
+-            return;
+-
+-        foreach (var proto in ev.Jobs)
+-        {
+-            if (!_manager.IsAllowed(ev.Player, proto))
+-                ev.Cancelled = true;
+-        }
++        if (!_manager.IsAllowed(ev.Player, ev.JobId))
++            ev.Cancelled = true;
+     }
+-    //TODO: Antagonist role whitelists?
+ 
+     private void OnGetDisallowedJobs(ref GetDisallowedJobsEvent ev)
+     {
+diff --git a/Content.Server/Players/PlayTimeTracking/PlayTimeTrackingSystem.cs b/Content.Server/Players/PlayTimeTracking/PlayTimeTrackingSystem.cs
+index f218de1c77..d55920f83c 100644
+--- a/Content.Server/Players/PlayTimeTracking/PlayTimeTrackingSystem.cs
++++ b/Content.Server/Players/PlayTimeTracking/PlayTimeTrackingSystem.cs
+@@ -54,7 +54,7 @@ public override void Initialize()
+         SubscribeLocalEvent<MobStateChangedEvent>(OnMobStateChanged);
+         SubscribeLocalEvent<PlayerJoinedLobbyEvent>(OnPlayerJoinedLobby);
+         SubscribeLocalEvent<StationJobsGetCandidatesEvent>(OnStationJobsGetCandidates);
+-        SubscribeLocalEvent<IsRoleAllowedEvent>(OnIsRoleAllowed);
++        SubscribeLocalEvent<IsJobAllowedEvent>(OnIsJobAllowed);
+         SubscribeLocalEvent<GetDisallowedJobsEvent>(OnGetDisallowedJobs);
+         _adminManager.OnPermsChanged += AdminPermsChanged;
+     }
+@@ -86,9 +86,6 @@ private void CalcTrackers(ICommonSession player, HashSet<string> trackers)
+         trackers.UnionWith(GetTimedRoles(player));
+     }
+ 
+-    /// <summary>
+-    /// Returns true if the player has an attached mob and it is alive (even if in critical).
+-    /// </summary>
+     private bool IsPlayerAlive(ICommonSession session)
+     {
+         var attached = session.AttachedEntity;
+@@ -179,9 +176,9 @@ private void OnStationJobsGetCandidates(ref StationJobsGetCandidatesEvent ev)
+         RemoveDisallowedJobs(ev.Player, ev.Jobs);
+     }
+ 
+-    private void OnIsRoleAllowed(ref IsRoleAllowedEvent ev)
++    private void OnIsJobAllowed(ref IsJobAllowedEvent ev)
+     {
+-        if (!IsAllowed(ev.Player, ev.Jobs) || !IsAllowed(ev.Player, ev.Antags))
++        if (!IsAllowed(ev.Player, ev.JobId))
+             ev.Cancelled = true;
+     }
+ 
+@@ -190,83 +187,10 @@ private void OnGetDisallowedJobs(ref GetDisallowedJobsEvent ev)
+         ev.Jobs.UnionWith(GetDisallowedJobs(ev.Player));
+     }
+ 
+-    /// <summary>
+-    /// Checks if the player meets role requirements.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="jobs">A list of role prototype IDs</param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+-    public bool IsAllowed(ICommonSession player, List<ProtoId<JobPrototype>>? jobs)
++    public bool IsAllowed(ICommonSession player, string role)
+     {
+-        if (jobs is null)
+-            return true;
+-
+-        foreach (var job in jobs)
+-        {
+-            if (!IsAllowed(player, job))
+-                return false;
+-        }
+-
+-        return true;
+-    }
+-
+-    /// <summary>
+-    /// Checks if the player meets role requirements.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="antags">A list of role prototype IDs</param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+-    public bool IsAllowed(ICommonSession player, List<ProtoId<AntagPrototype>>? antags)
+-    {
+-        if (antags is null)
+-            return true;
+-
+-        foreach (var antag in antags)
+-        {
+-            if (!IsAllowed(player, antag))
+-                return false;
+-        }
+-
+-        return true;
+-    }
+-
+-    /// <summary>
+-    /// Checks if the player meets role requirements.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="job">A list of role prototype IDs</param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+-    public bool IsAllowed(ICommonSession player, ProtoId<JobPrototype> job)
+-    {
+-        if (!_cfg.GetCVar(CCVars.GameRoleTimers))
+-            return true;
+-
+-        if (!_tracking.TryGetTrackerTimes(player, out var playTimes))
+-        {
+-            Log.Error($"Unable to check playtimes {Environment.StackTrace}");
+-            playTimes = new Dictionary<string, TimeSpan>();
+-        }
+-
+-        var requirements = _roles.GetRoleRequirements(job);
+-        return JobRequirements.TryRequirementsMet(
+-            requirements,
+-            playTimes,
+-            out _,
+-            EntityManager,
+-            _prototypes,
+-            (HumanoidCharacterProfile?)
+-            _preferencesManager.GetPreferences(player.UserId).SelectedCharacter);
+-    }
+-
+-    /// <summary>
+-    /// Checks if the player meets role requirements.
+-    /// </summary>
+-    /// <param name="player">The player.</param>
+-    /// <param name="antag">A list of role prototype IDs</param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+-    public bool IsAllowed(ICommonSession player, ProtoId<AntagPrototype> antag)
+-    {
+-        if (!_cfg.GetCVar(CCVars.GameRoleTimers))
++        if (!_prototypes.TryIndex<JobPrototype>(role, out var job) ||
++            !_cfg.GetCVar(CCVars.GameRoleTimers))
+             return true;
+ 
+         if (!_tracking.TryGetTrackerTimes(player, out var playTimes))
+@@ -275,15 +199,7 @@ public bool IsAllowed(ICommonSession player, ProtoId<AntagPrototype> antag)
+             playTimes = new Dictionary<string, TimeSpan>();
+         }
+ 
+-        var requirements = _roles.GetRoleRequirements(antag);
+-        return JobRequirements.TryRequirementsMet(
+-            requirements,
+-            playTimes,
+-            out _,
+-            EntityManager,
+-            _prototypes,
+-            (HumanoidCharacterProfile?)
+-            _preferencesManager.GetPreferences(player.UserId).SelectedCharacter);
++        return JobRequirements.TryRequirementsMet(job, playTimes, out _, EntityManager, _prototypes, (HumanoidCharacterProfile?) _preferencesManager.GetPreferences(player.UserId).SelectedCharacter);
+     }
+ 
+     public HashSet<ProtoId<JobPrototype>> GetDisallowedJobs(ICommonSession player)
+diff --git a/Content.Server/Station/Systems/StationJobsSystem.Roundstart.cs b/Content.Server/Station/Systems/StationJobsSystem.Roundstart.cs
+index 1dd7b70f8d..3510aca85e 100644
+--- a/Content.Server/Station/Systems/StationJobsSystem.Roundstart.cs
++++ b/Content.Server/Station/Systems/StationJobsSystem.Roundstart.cs
+@@ -371,7 +371,7 @@ private Dictionary<NetUserId, List<string>> GetPlayersJobCandidates(int? weight,
+                 if (weight is not null && job.Weight != weight.Value)
+                     continue;
+ 
+-                if (!(roleBans == null || !roleBans.Contains(jobId))) //TODO: Replace with IsRoleBanned
++                if (!(roleBans == null || !roleBans.Contains(jobId)))
+                     continue;
+ 
+                 availableJobs ??= new List<string>(profile.JobPriorities.Count);
+diff --git a/Content.Server/Zombies/ZombieSystem.Transform.cs b/Content.Server/Zombies/ZombieSystem.Transform.cs
+index 8b5db4561c..9c7d4b0699 100644
+--- a/Content.Server/Zombies/ZombieSystem.Transform.cs
++++ b/Content.Server/Zombies/ZombieSystem.Transform.cs
+@@ -1,9 +1,7 @@
+-using Content.Server.Administration.Managers;
+ using Content.Server.Atmos.Components;
+ using Content.Server.Body.Components;
+ using Content.Server.Chat;
+ using Content.Server.Chat.Managers;
+-using Content.Server.Ghost;
+ using Content.Server.Ghost.Roles.Components;
+ using Content.Server.Humanoid;
+ using Content.Server.IdentityManagement;
+@@ -16,7 +14,6 @@
+ using Content.Server.Speech.Components;
+ using Content.Server.Temperature.Components;
+ using Content.Shared.Body.Components;
+-using Content.Shared.Chat;
+ using Content.Shared.CombatMode;
+ using Content.Shared.CombatMode.Pacification;
+ using Content.Shared.Damage;
+@@ -43,7 +40,6 @@
+ using Robust.Shared.Player;
+ using Robust.Shared.Prototypes;
+ using Content.Shared.NPC.Prototypes;
+-using Content.Shared.Roles;
+ 
+ namespace Content.Server.Zombies;
+ 
+@@ -56,27 +52,23 @@ namespace Content.Server.Zombies;
+ public sealed partial class ZombieSystem
+ {
+     [Dependency] private readonly SharedAudioSystem _audio = default!;
+-    [Dependency] private readonly IBanManager _ban = default!;
+     [Dependency] private readonly IChatManager _chatMan = default!;
+     [Dependency] private readonly SharedCombatModeSystem _combat = default!;
+     [Dependency] private readonly NpcFactionSystem _faction = default!;
+-    [Dependency] private readonly GhostSystem _ghost = default!;
+     [Dependency] private readonly SharedHandsSystem _hands = default!;
+     [Dependency] private readonly HumanoidAppearanceSystem _humanoidAppearance = default!;
+     [Dependency] private readonly IdentitySystem _identity = default!;
+     [Dependency] private readonly ServerInventorySystem _inventory = default!;
+     [Dependency] private readonly MindSystem _mind = default!;
+     [Dependency] private readonly MovementSpeedModifierSystem _movementSpeedModifier = default!;
+-    [Dependency] private readonly NameModifierSystem _nameMod = default!;
+     [Dependency] private readonly NPCSystem _npc = default!;
+     [Dependency] private readonly TagSystem _tag = default!;
++    [Dependency] private readonly NameModifierSystem _nameMod = default!;
+     [Dependency] private readonly ISharedPlayerManager _player = default!;
+ 
+     private static readonly ProtoId<TagPrototype> InvalidForGlobalSpawnSpellTag = "InvalidForGlobalSpawnSpell";
+     private static readonly ProtoId<TagPrototype> CannotSuicideTag = "CannotSuicide";
+     private static readonly ProtoId<NpcFactionPrototype> ZombieFaction = "Zombie";
+-    private static readonly string MindRoleZombie = "MindRoleZombie";
+-    private static readonly List<ProtoId<AntagPrototype>> BannableZombiePrototypes = ["Zombie"];
+ 
+     /// <summary>
+     /// Handles an entity turning into a zombie when they die or go into crit
+@@ -111,24 +103,6 @@ public void ZombifyEntity(EntityUid target, MobStateComponent? mobState = null)
+         if (!Resolve(target, ref mobState, logMissing: false))
+             return;
+ 
+-        // Detach role-banned players before zombification
+-        if (TryComp<ActorComponent>(target, out var actor) && _ban.IsRoleBanned(actor.PlayerSession, BannableZombiePrototypes))
+-        {
+-            var sess = actor.PlayerSession;
+-            var message = Loc.GetString("zombie-roleban-ghosted");
+-
+-            if (_mind.TryGetMind(sess, out var playerMindEnt, out var playerMind))
+-            {
+-                // Detach
+-                _ghost.SpawnGhost((playerMindEnt, playerMind), target);
+-
+-                // Notify
+-                _chatMan.DispatchServerMessage(sess, message);
+-            }
+-            else
+-                Log.Error($"Mind for session '{sess}' could not be found");
+-        }
+-
+         //you're a real zombie now, son.
+         var zombiecomp = AddComp<ZombieComponent>(target);
+ 
+@@ -271,7 +245,7 @@ public void ZombifyEntity(EntityUid target, MobStateComponent? mobState = null)
+         if (hasMind && mind != null && _player.TryGetSessionById(mind.UserId, out var session))
+         {
+             //Zombie role for player manifest
+-            _role.MindAddRole(mindId, MindRoleZombie, mind: null, silent: true);
++            _role.MindAddRole(mindId, "MindRoleZombie", mind: null, silent: true);
+ 
+             //Greeting message for new bebe zombers
+             _chatMan.DispatchServerMessage(session, Loc.GetString("zombie-infection-greeting"));
+@@ -292,7 +266,6 @@ public void ZombifyEntity(EntityUid target, MobStateComponent? mobState = null)
+             ghostRole.RoleName = Loc.GetString("zombie-generic");
+             ghostRole.RoleDescription = Loc.GetString("zombie-role-desc");
+             ghostRole.RoleRules = Loc.GetString("zombie-role-rules");
+-            ghostRole.MindRoles.Add(MindRoleZombie);
+         }
+ 
+         if (TryComp<HandsComponent>(target, out var handsComp))
+diff --git a/Content.Shared/Administration/BanPanelEuiState.cs b/Content.Shared/Administration/BanPanelEuiState.cs
+index 76de3d8e3f..74c340566b 100644
+--- a/Content.Shared/Administration/BanPanelEuiState.cs
++++ b/Content.Shared/Administration/BanPanelEuiState.cs
+@@ -1,8 +1,6 @@
+ using System.Net;
+ using Content.Shared.Database;
+ using Content.Shared.Eui;
+-using Content.Shared.Roles;
+-using Robust.Shared.Prototypes;
+ using Robust.Shared.Serialization;
+ 
+ namespace Content.Shared.Administration;
+@@ -23,9 +21,32 @@ public BanPanelEuiState(string playerName, bool hasBan)
+ public static class BanPanelEuiStateMsg
+ {
+     [Serializable, NetSerializable]
+-    public sealed class CreateBanRequest(Ban ban) : EuiMessageBase
++    public sealed class CreateBanRequest : EuiMessageBase
+     {
+-        public Ban Ban { get; } = ban;
++        public string? Player { get; set; }
++        public string? IpAddress { get; set; }
++        public ImmutableTypedHwid? Hwid { get; set; }
++        public uint Minutes { get; set; }
++        public string Reason { get; set; }
++        public NoteSeverity Severity { get; set; }
++        public string[]? Roles { get; set; }
++        public bool UseLastIp { get; set; }
++        public bool UseLastHwid { get; set; }
++        public bool Erase { get; set; }
++
++        public CreateBanRequest(string? player, (IPAddress, int)? ipAddress, bool useLastIp, ImmutableTypedHwid? hwid, bool useLastHwid, uint minutes, string reason, NoteSeverity severity, string[]? roles, bool erase)
++        {
++            Player = player;
++            IpAddress = ipAddress == null ? null : $"{ipAddress.Value.Item1}/{ipAddress.Value.Item2}";
++            UseLastIp = useLastIp;
++            Hwid = hwid;
++            UseLastHwid = useLastHwid;
++            Minutes = minutes;
++            Reason = reason;
++            Severity = severity;
++            Roles = roles;
++            Erase = erase;
++        }
+     }
+ 
+     [Serializable, NetSerializable]
+@@ -39,50 +60,3 @@ public GetPlayerInfoRequest(string username)
+         }
+     }
+ }
+-
+-/// <summary>
+-///     Contains all the data related to a particular ban action created by the BanPanel window.
+-/// </summary>
+-[Serializable, NetSerializable]
+-public sealed record Ban
+-{
+-    public Ban(
+-        string? target,
+-        (IPAddress, int)? ipAddressTuple,
+-        bool useLastIp,
+-        ImmutableTypedHwid? hwid,
+-        bool useLastHwid,
+-        uint banDurationMinutes,
+-        string reason,
+-        NoteSeverity severity,
+-        ProtoId<JobPrototype>[]? bannedJobs,
+-        ProtoId<AntagPrototype>[]? bannedAntags,
+-        bool erase)
+-    {
+-        Target = target;
+-        IpAddress = ipAddressTuple?.Item1.ToString();
+-        IpAddressHid = ipAddressTuple?.Item2.ToString() ?? "0";
+-        UseLastIp = useLastIp;
+-        Hwid = hwid;
+-        UseLastHwid = useLastHwid;
+-        BanDurationMinutes = banDurationMinutes;
+-        Reason = reason;
+-        Severity = severity;
+-        BannedJobs = bannedJobs;
+-        BannedAntags = bannedAntags;
+-        Erase = erase;
+-    }
+-
+-    public readonly string? Target;
+-    public readonly string? IpAddress;
+-    public readonly string? IpAddressHid;
+-    public readonly bool UseLastIp;
+-    public readonly ImmutableTypedHwid? Hwid;
+-    public readonly bool UseLastHwid;
+-    public readonly uint BanDurationMinutes;
+-    public readonly string Reason;
+-    public readonly NoteSeverity Severity;
+-    public readonly ProtoId<JobPrototype>[]? BannedJobs;
+-    public readonly ProtoId<AntagPrototype>[]? BannedAntags;
+-    public readonly bool Erase;
+-}
+diff --git a/Content.Shared/Ghost/Roles/GhostRolesEuiMessages.cs b/Content.Shared/Ghost/Roles/GhostRolesEuiMessages.cs
+index 38086da856..b5d8fedbd9 100644
+--- a/Content.Shared/Ghost/Roles/GhostRolesEuiMessages.cs
++++ b/Content.Shared/Ghost/Roles/GhostRolesEuiMessages.cs
+@@ -1,6 +1,5 @@
+ using Content.Shared.Eui;
+ using Content.Shared.Roles;
+-using Robust.Shared.Prototypes;
+ using Robust.Shared.Serialization;
+ 
+ namespace Content.Shared.Ghost.Roles
+@@ -13,10 +12,11 @@ public struct GhostRoleInfo
+         public string Description { get; set; }
+         public string Rules { get; set; }
+ 
+-        /// <summary>
+-        /// A list of all antag and job prototype IDs of the ghost role and its mind role(s).
+-        /// </summary>
+-        public (List<ProtoId<JobPrototype>>?,List<ProtoId<AntagPrototype>>?)  RolePrototypes;
++        // TODO ROLE TIMERS
++        // Actually make use of / enforce this requirement?
++        // Why is this even here.
++        // Move to ghost role prototype & respect CCvars.GameRoleTimerOverride
++        public HashSet<JobRequirement>? Requirements { get; set; }
+ 
+         /// <inheritdoc cref="GhostRoleKind"/>
+         public GhostRoleKind Kind { get; set; }
+diff --git a/Content.Shared/Players/MsgRoleBans.cs b/Content.Shared/Players/MsgRoleBans.cs
+index bcc28d01d2..fd90f62b0b 100644
+--- a/Content.Shared/Players/MsgRoleBans.cs
++++ b/Content.Shared/Players/MsgRoleBans.cs
+@@ -11,40 +11,24 @@ public sealed class MsgRoleBans : NetMessage
+ {
+     public override MsgGroups MsgGroup => MsgGroups.EntityEvent;
+ 
+-    public List<string> JobBans = new();
+-    public List<string> AntagBans = new();
++    public List<string> Bans = new();
+ 
+     public override void ReadFromBuffer(NetIncomingMessage buffer, IRobustSerializer serializer)
+     {
+-        var jobCount = buffer.ReadVariableInt32();
+-        JobBans.EnsureCapacity(jobCount);
++        var count = buffer.ReadVariableInt32();
++        Bans.EnsureCapacity(count);
+ 
+-        for (var i = 0; i < jobCount; i++)
++        for (var i = 0; i < count; i++)
+         {
+-            JobBans.Add(buffer.ReadString());
+-        }
+-
+-        var antagCount = buffer.ReadVariableInt32();
+-        AntagBans.EnsureCapacity(antagCount);
+-
+-        for (var i = 0; i < antagCount; i++)
+-        {
+-            AntagBans.Add(buffer.ReadString());
++            Bans.Add(buffer.ReadString());
+         }
+     }
+ 
+     public override void WriteToBuffer(NetOutgoingMessage buffer, IRobustSerializer serializer)
+     {
+-        buffer.WriteVariableInt32(JobBans.Count);
+-
+-        foreach (var ban in JobBans)
+-        {
+-            buffer.Write(ban);
+-        }
+-
+-        buffer.WriteVariableInt32(AntagBans.Count);
++        buffer.WriteVariableInt32(Bans.Count);
+ 
+-        foreach (var ban in AntagBans)
++        foreach (var ban in Bans)
+         {
+             buffer.Write(ban);
+         }
+diff --git a/Content.Shared/Roles/AntagPrototype.cs b/Content.Shared/Roles/AntagPrototype.cs
+index 367b05c3dd..ff2712600a 100644
+--- a/Content.Shared/Roles/AntagPrototype.cs
++++ b/Content.Shared/Roles/AntagPrototype.cs
+@@ -10,12 +10,6 @@ namespace Content.Shared.Roles;
+ [Prototype]
+ public sealed partial class AntagPrototype : IPrototype
+ {
+-    // The name to group all antagonists under. Equivalent to DepartmentPrototype IDs.
+-    public static readonly string GroupName = "Antagonist";
+-
+-    // The colour to group all antagonists using. Equivalent to DepartmentPrototype Color fields.
+-    public static readonly Color GroupColor = Color.Red;
+-
+     [ViewVariables]
+     [IdDataField]
+     public string ID { get; private set; } = default!;
+@@ -47,6 +41,8 @@ public sealed partial class AntagPrototype : IPrototype
+     /// <summary>
+     ///     Requirements that must be met to opt in to this antag role.
+     /// </summary>
++    // TODO ROLE TIMERS
++    // Actually check if the requirements are met. Because apparently this is actually unused.
+     [DataField, Access(typeof(SharedRoleSystem), Other = AccessPermissions.None)]
+     public HashSet<JobRequirement>? Requirements;
+ 
+diff --git a/Content.Shared/Roles/JobRequirements.cs b/Content.Shared/Roles/JobRequirements.cs
+index 62d50f8489..17f5f7bd6a 100644
+--- a/Content.Shared/Roles/JobRequirements.cs
++++ b/Content.Shared/Roles/JobRequirements.cs
+@@ -8,13 +8,6 @@ namespace Content.Shared.Roles;
+ 
+ public static class JobRequirements
+ {
+-    /// <summary>
+-    /// Checks if the requirements of the job are met by the provided play-times.
+-    /// </summary>
+-    /// <param name="job"> The job to test. </param>
+-    /// <param name="playTimes"> The playtimes used for the check. </param>
+-    /// <param name="reason"> If the requirements were not met, details are provided here. </param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+     public static bool TryRequirementsMet(
+         JobPrototype job,
+         IReadOnlyDictionary<string, TimeSpan> playTimes,
+@@ -24,25 +17,7 @@ public static bool TryRequirementsMet(
+         HumanoidCharacterProfile? profile)
+     {
+         var sys = entManager.System<SharedRoleSystem>();
+-        var requirements = sys.GetRoleRequirements(job);
+-        return TryRequirementsMet(requirements, playTimes, out reason, entManager, protoManager, profile);
+-    }
+-
+-    /// <summary>
+-    /// Checks if the list of requirements are met by the provided play-times.
+-    /// </summary>
+-    /// <param name="requirements"> The requirements to test. </param>
+-    /// <param name="playTimes"> The playtimes used for the check. </param>
+-    /// <param name="reason"> If the requirements were not met, details are provided here. </param>
+-    /// <returns>Returns true if all requirements were met or there were no requirements.</returns>
+-    public static bool TryRequirementsMet(
+-        HashSet<JobRequirement>? requirements,
+-        IReadOnlyDictionary<string, TimeSpan> playTimes,
+-        [NotNullWhen(false)] out FormattedMessage? reason,
+-        IEntityManager entManager,
+-        IPrototypeManager protoManager,
+-        HumanoidCharacterProfile? profile)
+-    {
++        var requirements = sys.GetJobRequirement(job);
+         reason = null;
+         if (requirements == null)
+             return true;
+diff --git a/Content.Shared/Roles/SharedRoleSystem.cs b/Content.Shared/Roles/SharedRoleSystem.cs
+index eeab329661..ea25555257 100644
+--- a/Content.Shared/Roles/SharedRoleSystem.cs
++++ b/Content.Shared/Roles/SharedRoleSystem.cs
+@@ -667,13 +667,10 @@ public void MindPlaySound(EntityUid mindId, SoundSpecifier? sound, MindComponent
+             _audio.PlayGlobal(sound, session);
+     }
+ 
+-    // TODO ROLES Change to readonly?
++    // TODO ROLES Change to readonly.
+     // Passing around a reference to a prototype's hashset makes me uncomfortable because it might be accidentally
+     // mutated.
+-    /// <summary>
+-    /// Returns the list of requirements for a role, or null. May be altered by requirement overrides.
+-    /// </summary>
+-    public HashSet<JobRequirement>? GetRoleRequirements(JobPrototype job)
++    public HashSet<JobRequirement>? GetJobRequirement(JobPrototype job)
+     {
+         if (_requirementOverride != null && _requirementOverride.Jobs.TryGetValue(job.ID, out var req))
+             return req;
+@@ -681,28 +678,31 @@ public void MindPlaySound(EntityUid mindId, SoundSpecifier? sound, MindComponent
+         return job.Requirements;
+     }
+ 
+-    // TODO ROLES Change to readonly?
+-    /// <inheritdoc cref="GetRoleRequirements(JobPrototype)"/>
+-    public HashSet<JobRequirement>? GetRoleRequirements(AntagPrototype antag)
++    // TODO ROLES Change to readonly.
++    public HashSet<JobRequirement>? GetJobRequirement(ProtoId<JobPrototype> job)
+     {
+-        if (_requirementOverride != null && _requirementOverride.Jobs.TryGetValue(antag.ID, out var req))
++        if (_requirementOverride != null && _requirementOverride.Jobs.TryGetValue(job, out var req))
+             return req;
+ 
+-        return antag.Requirements;
++        return _prototypes.Index(job).Requirements;
+     }
+ 
+-    // TODO ROLES Change to readonly?
+-    /// <inheritdoc cref="GetRoleRequirements(JobPrototype)"/>
+-    public HashSet<JobRequirement>? GetRoleRequirements(ProtoId<JobPrototype> jobId)
++    // TODO ROLES Change to readonly.
++    public HashSet<JobRequirement>? GetAntagRequirement(ProtoId<AntagPrototype> antag)
+     {
+-        return _prototypes.TryIndex(jobId, out var job) ? GetRoleRequirements(job) : null;
++        if (_requirementOverride != null && _requirementOverride.Antags.TryGetValue(antag, out var req))
++            return req;
++
++        return _prototypes.Index(antag).Requirements;
+     }
+ 
+-    // TODO ROLES Change to readonly?
+-    /// <inheritdoc cref="GetRoleRequirements(JobPrototype)"/>
+-    public HashSet<JobRequirement>? GetRoleRequirements(ProtoId<AntagPrototype> antagId)
++    // TODO ROLES Change to readonly.
++    public HashSet<JobRequirement>? GetAntagRequirement(AntagPrototype antag)
+     {
+-        return _prototypes.TryIndex(antagId, out var antag) ? GetRoleRequirements(antag) : null;
++        if (_requirementOverride != null && _requirementOverride.Antags.TryGetValue(antag.ID, out var req))
++            return req;
++
++        return antag.Requirements;
+     }
+ 
+     /// <summary>
+diff --git a/Resources/Locale/en-US/zombies/zombie.ftl b/Resources/Locale/en-US/zombies/zombie.ftl
+index 39ee550bf9..4643cd228b 100644
+--- a/Resources/Locale/en-US/zombies/zombie.ftl
++++ b/Resources/Locale/en-US/zombies/zombie.ftl
+@@ -9,5 +9,3 @@ zombie-role-rules = You are a [color={role-type-team-antagonist-color}][bold]{ro
+ zombie-permadeath = This time, you're dead for real.
+ 
+ zombification-resistance-coefficient-value = - [color=violet]Infection[/color] chance reduced by [color=lightblue]{$value}%[/color].
+-
+-zombie-roleban-ghosted = You have been ghosted because you are banned from playing the Zombie role.
+diff --git a/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml b/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
+index d3f2e172ec..5815dbba47 100644
+--- a/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
++++ b/Resources/Prototypes/Entities/Markers/Spawners/ghost_roles.yml
+@@ -1,7 +1,3 @@
+-# The mind roles specified here will be overwritten by the actual entities' GhostRoleComponent when they spawn
+-# But the mind roles specified here are the ones checked for role bans when taking a ghost role!
+-# TODO make this simpler
+-
+ - type: entity
+   abstract: true
+   parent: MarkerBase
+@@ -92,7 +88,7 @@
+   - type: GhostRole
+     rules: ghost-role-information-rules-default-team-antagonist
+     mindRoles:
+-    - MindRoleNukeops
++    - MindRoleGhostRoleTeamAntagonist
+     raffle:
+       settings: default
+   - type: GhostRoleMobSpawner
+@@ -132,7 +128,7 @@
+     description: roles-antag-nuclear-operative-commander-objective
+     rules: ghost-role-information-rules-default-team-antagonist
+     mindRoles:
+-    - MindRoleNukeopsCommander
++    - MindRoleGhostRoleTeamAntagonist
+ 
+ - type: entity
+   categories: [ HideSpawnMenu, Spawner ]
+@@ -144,7 +140,7 @@
+     description: roles-antag-nuclear-operative-agent-objective
+     rules: ghost-role-information-rules-default-team-antagonist
+     mindRoles:
+-    - MindRoleNukeopsMedic
++    - MindRoleGhostRoleTeamAntagonist
+ 
+ - type: entity
+   categories: [ HideSpawnMenu, Spawner ]
+@@ -156,7 +152,7 @@
+     description: roles-antag-nuclear-operative-objective
+     rules: ghost-role-information-rules-default-team-antagonist
+     mindRoles:
+-    - MindRoleNukeops
++    - MindRoleGhostRoleTeamAntagonist
+ 
+ - type: entity
+   categories: [ HideSpawnMenu, Spawner ]
+@@ -168,7 +164,7 @@
+     description: ghost-role-information-space-dragon-description
+     rules: ghost-role-information-space-dragon-rules
+     mindRoles:
+-    - MindRoleDragon
++    - MindRoleGhostRoleTeamAntagonist
+   - type: Sprite
+     layers:
+     - state: green
+@@ -185,7 +181,7 @@
+     description: ghost-role-information-space-ninja-description
+     rules: ghost-role-information-antagonist-rules
+     mindRoles:
+-    - MindRoleNinja
++    - MindRoleGhostRoleSoloAntagonist
+     raffle:
+       settings: default
+   - type: Sprite
+@@ -205,7 +201,7 @@
+     description: ghost-role-information-paradox-clone-description
+     rules: ghost-role-information-antagonist-rules
+     mindRoles:
+-    - MindRoleParadoxClone
++    - MindRoleGhostRoleSoloAntagonist
+     raffle:
+       settings: default
+   - type: Sprite
+@@ -236,8 +232,6 @@
+     name: ghost-role-information-derelict-cyborg-name
+     description: ghost-role-information-derelict-cyborg-description
+     rules: ghost-role-information-silicon-rules
+-    mindRoles:
+-    - MindRoleSubvertedSilicon
+     raffle:
+       settings: default
+   - type: Sprite
+@@ -306,7 +300,7 @@
+     name: ghost-role-information-wizard-name
+     description: ghost-role-information-wizard-desc
+     mindRoles:
+-    - MindRoleWizard
++    - MindRoleGhostRoleSoloAntagonist
+     raffle:
+       settings: default
+   - type: Sprite
+diff --git a/Resources/Prototypes/Entities/Mobs/Player/humanoid.yml b/Resources/Prototypes/Entities/Mobs/Player/humanoid.yml
+index f8cbae86a4..1f7ab7ac5c 100644
+--- a/Resources/Prototypes/Entities/Mobs/Player/humanoid.yml
++++ b/Resources/Prototypes/Entities/Mobs/Player/humanoid.yml
+@@ -57,7 +57,6 @@
+         settings: short
+       mindRoles:
+       - MindRoleGhostRoleFamiliar
+-      job: DeathSquad
+     - type: Loadout
+       prototypes: [ DeathSquadGear ]
+       roleLoadout: [ RoleSurvivalEVA ]
+@@ -537,7 +536,6 @@
+       rules: ghost-role-information-nonantagonist-rules
+       raffle:
+         settings: short
+-      job: CBURN
+     - type: RandomMetadata
+       nameSegments:
+       - NamesMilitaryFirst
+@@ -566,7 +564,6 @@
+       rules: ghost-role-information-nonantagonist-rules
+       raffle:
+         settings: default
+-      job: CentralCommandOfficial
+     - type: Loadout
+       prototypes: [ CentcomGear ]
+       roleLoadout: [ RoleSurvivalStandard ]
+diff --git a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
+index 1c416083bc..50a2e0b58e 100644
+--- a/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
++++ b/Resources/Prototypes/Entities/Mobs/Player/silicon.yml
+@@ -177,7 +177,7 @@
+   suffix: Empty
+   components:
+   - type: Anchorable
+-    flags:
++    flags: 
+     - Anchorable
+   - type: Rotatable
+   - type: WarpPoint
+@@ -560,7 +560,6 @@
+       rules: ghost-role-information-silicon-rules
+       raffle:
+         settings: default
+-      job: Borg
+     - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -594,7 +593,6 @@
+       rules: ghost-role-information-silicon-rules
+       raffle:
+         settings: default
+-      job: Borg
+     - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -648,7 +646,6 @@
+     raffle:
+       settings: default
+     reregister: false
+-    job: Borg
+   - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -683,7 +680,6 @@
+       raffle:
+         settings: default
+       reregister: false
+-      job: Borg
+     - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -720,7 +716,6 @@
+     raffle:
+       settings: default
+     reregister: false
+-    job: Borg
+   - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -758,7 +753,6 @@
+     raffle:
+       settings: default
+     reregister: false
+-    job: Borg
+   - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -795,7 +789,6 @@
+     raffle:
+       settings: default
+     reregister: false
+-    job: Borg
+   - type: GhostTakeoverAvailable
+ 
+ - type: entity
+@@ -831,5 +824,4 @@
+     raffle:
+       settings: default
+     reregister: false
+-    job: Borg
+   - type: GhostTakeoverAvailable
+diff --git a/Resources/Prototypes/Entities/Objects/Devices/Syndicate_Gadgets/reinforcement_teleporter.yml b/Resources/Prototypes/Entities/Objects/Devices/Syndicate_Gadgets/reinforcement_teleporter.yml
+index 27d077df2f..79a10b6287 100644
+--- a/Resources/Prototypes/Entities/Objects/Devices/Syndicate_Gadgets/reinforcement_teleporter.yml
++++ b/Resources/Prototypes/Entities/Objects/Devices/Syndicate_Gadgets/reinforcement_teleporter.yml
+@@ -115,6 +115,5 @@
+       - MindRoleGhostRoleSilicon
+       raffle:
+         settings: default
+-      job: Borg
+     - type: GhostRoleMobSpawner
+       prototype: PlayerBorgSyndicateAssaultBattery
